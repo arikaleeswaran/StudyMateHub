@@ -1,0 +1,13 @@
+# Python
+server/venv/
+server/__pycache__/
+*.pyc
+
+# Node.js (Frontend)
+client/node_modules/
+client/dist/
+client/.env
+
+# Security (NEVER UPLOAD THESE)
+server/.env
+.env
