@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { getRoadmap } from '../services/api';
 import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
-import KnowledgeCheckModal from '../components/KnowledgeCheckModal'; // <--- IMPORT THIS
+import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
 
 function RoadmapGraph() {
   const { topic } = useParams();
@@ -13,48 +13,69 @@ function RoadmapGraph() {
   const [resources, setResources] = useState({ videos: [], pdfs: [] });
   
   // MODAL STATES
-  const [showCheckModal, setShowCheckModal] = useState(false); // First Popup (Yes/No)
-  const [showQuizModal, setShowQuizModal] = useState(false);   // Quiz Popup
-  const [checkNode, setCheckNode] = useState(null);            // Node being clicked
+  const [showCheckModal, setShowCheckModal] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [checkNode, setCheckNode] = useState(null);
   const [loadingResources, setLoadingResources] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
+  
+  // PREVENT DOUBLE FETCH
+  const mapFetched = useRef(false);
 
   // --- 1. LOAD ROADMAP ---
   useEffect(() => {
+    if (mapFetched.current === topic) return;
+
     const loadRoadmap = async () => {
-        setMapLoading(true);
-        try {
-            const data = await getRoadmap(topic);
-            if (data && data.nodes) setNodes(data.nodes);
-        } catch(e) { 
-            console.error(e);
-        } finally {
-            setMapLoading(false);
-        }
+      mapFetched.current = topic;
+      setMapLoading(true);
+      try {
+        const data = await getRoadmap(topic);
+        if (data && data.nodes) setNodes(data.nodes);
+        else throw new Error("No data");
+      } catch(e) { 
+        console.error(e);
+        // Fallback data if API fails
+        setNodes([
+            { id: "1", label: `${topic} Basics` },
+            { id: "2", label: "Core Concepts" },
+            { id: "3", label: "Tools & Setup" },
+            { id: "4", label: "Intermediate Skills" },
+            { id: "5", label: "Advanced Topics" },
+            { id: "6", label: "Real-world Projects" }
+        ]);
+      } finally {
+        setMapLoading(false);
+      }
     };
     if (topic) loadRoadmap();
   }, [topic]);
 
-  // --- 2. CLICK HANDLER (OPENS POPUP INSTEAD OF ALERT) ---
+  // --- 2. CLICK HANDLERS ---
   const handleNodeClick = (node) => {
     if (selectedNode?.id === node.id) return; 
     setCheckNode(node);
-    setShowCheckModal(true); // <--- This triggers the beautiful design
+    setShowCheckModal(true);
   };
 
-  // --- 3. HANDLE "YES" (Take Quiz) ---
   const handleKnowsTopic = () => {
     setShowCheckModal(false);
     setShowQuizModal(true);
   };
 
-  // --- 4. HANDLE "NO" (View Resources) ---
   const handleNewTopic = () => {
     setShowCheckModal(false);
     fetchResources(checkNode);
   };
 
-  // --- 5. FETCH RESOURCES ---
+  const handleQuizComplete = (score, feedback) => {
+    setShowQuizModal(false);
+    alert(`Quiz Complete! Score: ${score}/5\nFeedback recorded.`);
+    // Save to DB here if needed
+    fetchResources(checkNode);
+  };
+
+  // --- 3. FETCH RESOURCES ---
   const fetchResources = async (node) => {
     setSelectedNode(node);
     setResources({ videos: [], pdfs: [] }); 
@@ -73,7 +94,7 @@ function RoadmapGraph() {
     }
   };
 
-  // --- 6. ZIG-ZAG LAYOUT ---
+  // --- 4. LAYOUT LOGIC ---
   const chunkSize = 4;
   const rows = [];
   for (let i = 0; i < nodes.length; i += chunkSize) {
@@ -84,7 +105,7 @@ function RoadmapGraph() {
       return (
           <div style={{height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center'}}>
               <div className="spinner"></div>
-              <h3 style={{marginTop:'20px', color:'#555'}}>Generating Path...</h3>
+              <h3 style={{marginTop:'20px', color:'#555'}}>Generating Learning Path...</h3>
           </div>
       )
   }
@@ -94,10 +115,10 @@ function RoadmapGraph() {
       
       {/* HEADER */}
       <div style={{ padding: '20px', borderBottom: '1px solid #eee', textAlign: 'center', background: '#fafafa', position:'sticky', top:0, zIndex:50 }}>
-        <h2 style={{ margin: 0, color: '#333' }}>🗺️ Path: <span style={{color: '#007bff'}}>{topic}</span></h2>
+        <h2 style={{ margin: 0, color: '#333', textTransform: 'capitalize' }}>🗺️ Path: <span style={{color: '#007bff'}}>{topic}</span></h2>
       </div>
 
-      {/* GRAPH */}
+      {/* GRAPH CONTAINER */}
       <div style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {rows.map((row, rowIndex) => {
           const isEvenRow = rowIndex % 2 === 0;
@@ -150,11 +171,10 @@ function RoadmapGraph() {
                 {loadingResources ? (
                     <div style={{textAlign:'center', padding:'40px'}}>
                         <div className="spinner"></div>
-                        <p style={{marginTop:'15px', color:'#666'}}>Fetching Videos & PDFs...</p>
+                        <p style={{marginTop:'15px', color:'#666'}}>Curating Best Content...</p>
                     </div>
                 ) : (
                     <div style={{display:'flex', gap:'40px', flexWrap:'wrap'}}>
-                        {/* VIDEOS */}
                         <div style={{flex: 1, minWidth:'300px'}}>
                             <h3 style={{display:'flex', alignItems:'center', gap:'10px', color:'#d32f2f'}}>
                                 <FaPlayCircle/> Video Tutorials
@@ -168,10 +188,9 @@ function RoadmapGraph() {
                                             <div className="video-channel">{v.channel}</div>
                                         </div>
                                     </a>
-                                )) : <p>No videos found.</p>}
+                                )) : <p>No long-form videos found.</p>}
                             </div>
                         </div>
-                        {/* PDFS */}
                         <div style={{flex: 1, minWidth:'300px'}}>
                              <h3 style={{display:'flex', alignItems:'center', gap:'10px', color:'#2e7d32'}}>
                                 <FaFilePdf/> Notes & PDFs
@@ -192,7 +211,6 @@ function RoadmapGraph() {
         )}
       </div>
 
-      {/* --- THIS IS THE NEW POPUP --- */}
       {showCheckModal && checkNode && (
         <KnowledgeCheckModal 
             nodeLabel={checkNode.label}
@@ -201,17 +219,12 @@ function RoadmapGraph() {
         />
       )}
 
-      {/* --- THIS IS THE QUIZ --- */}
       {showQuizModal && checkNode && (
         <AssessmentModal 
             mainTopic={topic} 
             subTopic={checkNode.label}
             onClose={() => setShowQuizModal(false)}
-            onComplete={(score) => {
-                setShowQuizModal(false);
-                alert(`Quiz Done! Score: ${score}`);
-                fetchResources(checkNode);
-            }}
+            onComplete={handleQuizComplete}
         />
       )}
 

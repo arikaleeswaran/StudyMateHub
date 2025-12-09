@@ -1,6 +1,23 @@
-body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; overflow-x: hidden; }
+/* GLOBAL RESET */
+body {
+  margin: 0; padding: 0; width: 100vw; min-height: 100vh;
+  background: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow-x: hidden;
+}
+#root { width: 100%; height: 100%; }
 
-/* 1. VISIBLE BUBBLES */
+/* --- LOADING SPINNER --- */
+.spinner {
+  border: 5px solid rgba(0, 0, 0, 0.1);
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  border-left-color: #007bff;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* --- NODE BUBBLES (ZIG-ZAG GRAPH) --- */
 .node-bubble {
   width: 160px; height: 160px;
   border-radius: 50%;
@@ -11,13 +28,19 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; overflo
   text-align: center; font-weight: 800; font-size: 14px;
   padding: 15px; cursor: pointer;
   box-shadow: 0 8px 20px rgba(0,0,0,0.15); /* Nice shadow */
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   z-index: 10; position: relative;
 }
-.node-bubble:hover { transform: scale(1.1); border-color: #007bff; color: #007bff; }
-.node-bubble.active { background: #007bff; color: white; border-color: #0056b3; transform: scale(1.15); }
+.node-bubble:hover {
+  transform: scale(1.1); border-color: #007bff; color: #007bff;
+  box-shadow: 0 15px 35px rgba(0,123,255,0.2);
+}
+.node-bubble.active {
+  background: #007bff; color: white; border-color: #0056b3;
+  transform: scale(1.15);
+}
 
-/* 2. VIDEO CARDS (Thumbnails) */
+/* --- RESOURCE CARDS (VIDEOS) --- */
 .video-card {
   display: flex; flex-direction: column;
   background: white; border: 1px solid #eee; border-radius: 10px;
@@ -28,10 +51,10 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; overflo
 .video-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
 .video-thumb { width: 100%; height: 160px; object-fit: cover; }
 .video-info { padding: 15px; }
-.video-title { font-weight: bold; font-size: 1rem; margin-bottom: 5px; }
+.video-title { font-weight: bold; font-size: 1rem; margin-bottom: 5px; line-height: 1.3; }
 .video-channel { font-size: 0.85rem; color: #777; }
 
-/* 3. PDF LINKS */
+/* --- RESOURCE LINKS (PDFS) --- */
 .pdf-link {
   display: flex; align-items: center;
   padding: 15px; background: #f8f9fa; border-radius: 8px;
@@ -41,18 +64,11 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; overflo
 }
 .pdf-link:hover { background: #e9ecef; transform: translateX(5px); }
 
-/* 4. MODAL & SPINNER */
-.modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:2000; backdrop-filter: blur(5px); }
-.modal-content { background:white; padding:40px; border-radius:20px; width:90%; max-width:600px; text-align:center; animation: popIn 0.3s; }
-.spinner { width: 50px; height: 50px; border: 5px solid #ddd; border-top-color: #007bff; border-radius: 50%; animation: spin 1s infinite; margin: 0 auto; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-/* --- ANIMATED POPUP DESIGN --- */
+/* --- MODALS (SHARED STYLES) --- */
 .modal-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(0, 0, 0, 0.6); /* Dark dim background */
-  backdrop-filter: blur(5px); /* Blur effect */
+  background: rgba(0, 0, 0, 0.7); /* Dark background */
+  backdrop-filter: blur(8px); /* Blur effect */
   display: flex; justify-content: center; align-items: center;
   z-index: 9999;
 }
@@ -62,21 +78,23 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; overflo
   padding: 40px;
   border-radius: 20px;
   text-align: center;
-  width: 90%; max-width: 450px;
+  width: 90%; max-width: 600px; /* Wide enough for Quiz */
   box-shadow: 0 25px 50px rgba(0,0,0,0.25);
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   transform: scale(0.8); opacity: 0;
+  max-height: 90vh; overflow-y: auto; /* Scroll if quiz is long */
 }
 
 @keyframes popIn {
   to { transform: scale(1); opacity: 1; }
 }
 
+/* Specific styles for Knowledge Check */
 .modal-title { font-size: 1.5rem; margin-bottom: 10px; color: #333; }
 .modal-text { font-size: 1.1rem; color: #666; margin-bottom: 30px; line-height: 1.5; }
-
 .btn-group { display: flex; justify-content: center; gap: 15px; }
 
+/* Buttons */
 .btn-yes {
   padding: 12px 30px; background: #28a745; color: white;
   border: none; border-radius: 50px; font-weight: bold; cursor: pointer;
@@ -90,3 +108,59 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; overflo
   font-size: 1rem; transition: transform 0.2s;
 }
 .btn-no:hover { transform: scale(1.05); background: #5a6268; }
+
+/* --- QUIZ SPECIFIC STYLES --- */
+.quiz-option {
+  width: 100%;
+  padding: 18px 20px;
+  text-align: left;
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex; align-items: center;
+  margin-bottom: 10px;
+}
+
+.quiz-option:hover {
+  border-color: #007bff;
+  background: #f8f9fa;
+  transform: translateX(5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.quiz-option:active {
+  background: #e7f1ff;
+  border-color: #0056b3;
+}
+
+/* Quiz Option Button */
+.quiz-option {
+  width: 100%;
+  padding: 15px 20px;
+  text-align: left;
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.quiz-option:hover {
+  background: #f8f9fa;
+  border-color: #007bff;
+  transform: translateX(5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.quiz-option:active {
+  background: #e7f1ff;
+  border-color: #0056b3;
+}

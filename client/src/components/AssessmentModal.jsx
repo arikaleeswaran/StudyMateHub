@@ -5,7 +5,7 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
   const [loading, setLoading] = useState(true);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [quizFinished, setQuizFinished] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
 
   useEffect(() => {
@@ -18,15 +18,12 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
         if (Array.isArray(data) && data.length > 0) {
             setQuestions(data);
         } else {
-            // Fallback Question
-            setQuestions([{
-                question: `What is the main concept of ${subTopic}?`,
-                options: ["Fundamental Theory", "Advanced Application", "Obsolete Tech", "None of the above"],
-                correct_answer: 0
-            }]);
+            throw new Error("No data");
         }
       } catch (err) {
         console.error(err);
+        // Emergency Fallback
+        setQuestions([{ question: "Could not generate quiz.", options: ["OK"], correct_answer: 0 }]);
       } finally {
         setLoading(false);
       }
@@ -42,7 +39,7 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
     if (currentQ + 1 < questions.length) {
       setCurrentQ(prev => prev + 1);
     } else {
-      setShowFeedback(true);
+      setQuizFinished(true);
     }
   };
 
@@ -50,62 +47,98 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
     onComplete(score, feedbackText);
   };
 
+  // Determine Difficulty Label
+  const getDifficulty = (index) => {
+      if (index < 2) return { label: "Easy", color: "#28a745" };
+      if (index < 4) return { label: "Medium", color: "#ffc107" };
+      return { label: "Hard 🔥", color: "#dc3545" };
+  };
+
   if (loading) {
     return (
-        <div className="modal-overlay">
+        <div className="modal-overlay" style={{ flexDirection: 'column' }}>
             <div className="spinner"></div>
-            <h2 style={{color:'white', marginTop:'20px'}}>Generating Quiz for {subTopic}...</h2>
+            <h3 style={{color:'white', marginTop:'20px', fontWeight: '300'}}>Generating Challenge... 🧠</h3>
         </div>
     );
   }
 
+  const difficulty = getDifficulty(currentQ);
+
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="modal-card" style={{ maxWidth: '650px', padding: '0', overflow: 'hidden' }}>
         
-        {!showFeedback ? (
+        {!quizFinished ? (
           <>
-            <h2 style={{marginBottom:'10px', color:'#007bff'}}>📝 Knowledge Check</h2>
-            <h3 style={{marginTop:0, color:'#555'}}>{subTopic}</h3>
-            
-            <div style={{background:'#f1f3f5', padding:'20px', borderRadius:'10px', margin:'20px 0'}}>
-                <h3 style={{margin:0}}>{questions[currentQ].question}</h3>
+            {/* HEADER with Progress */}
+            <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {subTopic}</h3>
+                <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: difficulty.color, background: '#fff', padding: '4px 10px', borderRadius: '12px', border: `1px solid ${difficulty.color}` }}>
+                    {difficulty.label}
+                </span>
             </div>
             
-            <div style={{display:'flex', flexDirection:'column'}}>
-              {questions[currentQ].options.map((opt, i) => (
-                <button key={i} onClick={() => handleAnswer(i)} className="modal-option-btn">
-                  {opt}
-                </button>
-              ))}
+            {/* PROGRESS BAR */}
+            <div style={{ width: '100%', height: '6px', background: '#eee' }}>
+                <div style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, height: '100%', background: '#007bff', transition: 'width 0.3s ease' }}></div>
             </div>
-            
-            <p style={{marginTop:'20px', color:'#999'}}>Question {currentQ + 1} of {questions.length}</p>
+
+            <div style={{ padding: '30px' }}>
+                <h2 style={{ fontSize: '1.4rem', marginBottom: '25px', lineHeight: '1.4', textAlign: 'left' }}>
+                    {questions[currentQ].question}
+                </h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {questions[currentQ].options.map((opt, i) => (
+                        <button key={i} onClick={() => handleAnswer(i)} className="quiz-option">
+                            <span style={{ fontWeight: 'bold', color: '#007bff', marginRight: '10px' }}>{String.fromCharCode(65 + i)}</span>
+                            {opt}
+                        </button>
+                    ))}
+                </div>
+                
+                <p style={{ marginTop: '20px', textAlign: 'right', color: '#999', fontSize: '0.9rem' }}>
+                    Question {currentQ + 1} of {questions.length}
+                </p>
+            </div>
           </>
         ) : (
-          <>
-            <h1>🎉 Quiz Complete!</h1>
-            <h2 style={{fontSize:'3rem', color: score >= 1 ? '#28a745' : '#dc3545', margin:'20px 0'}}>
-                {score} / {questions.length}
-            </h2>
+          /* RESULT SCREEN */
+          <div style={{ padding: '40px' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '10px' }}>
+                {score >= 3 ? "🏆" : "💪"}
+            </div>
             
-            <p style={{fontSize:'1.2rem'}}>How confident do you feel about this topic?</p>
+            <h1 style={{ margin: '10px 0', color: '#333' }}>
+                {score >= 3 ? "Knowledge Verified!" : "Keep Learning!"}
+            </h1>
+            
+            <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '30px' }}>
+                You scored <strong>{score} / {questions.length}</strong> correct.
+            </p>
+
+            <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '20px 0' }} />
+
+            <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>
+                How was this quiz? (Optional Feedback)
+            </label>
             <textarea 
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="Type your thoughts here..."
-              style={{width:'100%', height:'100px', padding:'15px', fontSize:'1rem', borderRadius:'10px', border:'1px solid #ccc', marginTop:'10px'}}
+              placeholder="Questions were too easy / ambiguous..."
+              style={{ width: '100%', height: '80px', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', resize: 'none' }}
             />
-            
-            <div style={{display:'flex', justifyContent:'center', gap:'20px', marginTop:'30px'}}>
-               <button onClick={onClose} style={{padding:'15px 30px', background:'#6c757d', color:'white', border:'none', borderRadius:'30px', fontSize:'1.2rem', cursor:'pointer'}}>
-                 Retry / Cancel
+
+            <div style={{ display: 'flex', gap: '15px', marginTop: '25px' }}>
+               <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#e9ecef', color: '#333', fontWeight: 'bold', cursor: 'pointer' }}>
+                 Close
                </button>
-               <button onClick={handleSubmit} style={{padding:'15px 30px', background:'#007bff', color:'white', border:'none', borderRadius:'30px', fontSize:'1.2rem', cursor:'pointer'}}>
-                 View Study Materials
+               <button onClick={handleSubmit} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#007bff', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>
+                 {score >= 3 ? "Continue Path" : "View Resources"}
                </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

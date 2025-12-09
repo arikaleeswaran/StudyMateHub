@@ -1,6 +1,6 @@
 import os
 import json
-import isodate  # NEW: You might need to pip install isodate
+import isodate
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -17,8 +17,12 @@ app = Flask(__name__)
 CORS(app)
 
 # Keys
-supabase: Client = create_client(os.environ.get(
-    "SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
+try:
+    supabase: Client = create_client(os.environ.get(
+        "SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
+except:
+    print("⚠️ Supabase Keys missing.")
+
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 model = genai.GenerativeModel('models/gemini-flash-latest')
 
@@ -28,6 +32,7 @@ try:
         'youtube', 'v3', developerKey=os.environ.get("YOUTUBE_API_KEY"))
 except:
     youtube_client = None
+    print("⚠️ YouTube API Key missing or invalid.")
 
 # --- HELPER: CHECK VIDEO DURATION (Kill Shorts) ---
 
@@ -43,6 +48,7 @@ def is_short(duration_iso):
 
 
 def generate_ai_roadmap(topic):
+    print(f"🧠 Generating Roadmap for: {topic}")
     prompt = f"""
     Create a linear 7-step learning path for '{topic}'.
     STRICT JSON ONLY. No markdown.
@@ -52,22 +58,105 @@ def generate_ai_roadmap(topic):
         response = model.generate_content(prompt)
         text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
-    except:
-        return {"nodes": [{"id": "1", "label": f"{topic} Basics"}]}  # Fallback
+    except Exception as e:
+        print(f"AI Error: {e}")
+        # Fallback if AI fails
+        return {
+            "nodes": [
+                {"id": "1", "label": f"{topic} Fundamentals"},
+                {"id": "2", "label": "Core Concepts"},
+                {"id": "3", "label": "Tools & Setup"},
+                {"id": "4", "label": "Intermediate Skills"},
+                {"id": "5", "label": "Advanced Topics"},
+                {"id": "6", "label": "Real-world Projects"},
+                {"id": "7", "label": "Career Prep"}
+            ]
+        }
 
 
 @app.route('/api/roadmap', methods=['GET'])
 def get_roadmap():
-    return jsonify(generate_ai_roadmap(request.args.get('topic')))
+    topic = request.args.get('topic')
 
-# --- LOGIC 2: QUIZ ---
+    # 1. Check DB
+    try:
+        existing = supabase.table('user_roadmaps').select(
+            'graph_data').eq('topic', topic).limit(1).execute()
+        if existing.data and len(existing.data) > 0:
+            print(f"📂 Found cached roadmap for: {topic}")
+            return jsonify(existing.data[0]['graph_data'])
+    except:
+        pass
+
+    # 2. Generate New
+    data = generate_ai_roadmap(topic)
+
+    # 3. Save to DB
+    try:
+        if data:
+            supabase.table('user_roadmaps').insert({
+                "user_id": "00000000-0000-0000-0000-000000000000",  # Placeholder UUID
+                "topic": topic,
+                "graph_data": data
+            }).execute()
+    except:
+        pass
+
+    return jsonify(data)
+
+# --- LOGIC 2: 5-QUESTION ADAPTIVE QUIZ ---
 
 
 @app.route('/api/quiz', methods=['GET'])
 def get_quiz():
-    # ... (Keep your existing quiz logic or paste from previous steps) ...
-    # Placeholder to save space here, use previous quiz code
-    return jsonify([])
+    main_topic = request.args.get('main_topic')
+    sub_topic = request.args.get('sub_topic')
+
+    print(f"🧠 Generating 5-Question Quiz for: {sub_topic}")
+
+    prompt = f"""
+    Create a 5-question multiple-choice quiz about '{sub_topic}' (Context: {main_topic}).
+    
+    STRICT RULES:
+    1. Return VALID JSON array. No markdown formatting.
+    2. Difficulty Mix:
+       - Q1: Basic Definition (Easy)
+       - Q2: Core Concept (Easy)
+       - Q3: Application/Use Case (Medium)
+       - Q4: Comparison/logic (Medium)
+       - Q5: Complex Scenario (Hard)
+    
+    JSON Format:
+    [
+        {{
+            "question": "The actual question text here?",
+            "options": ["Correct Answer", "Wrong A", "Wrong B", "Wrong C"],
+            "correct_answer": 0 // The index (0-3) of the correct answer
+        }}
+    ]
+    """
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.replace("```json", "").replace("```", "").strip()
+        # Fix common AI JSON errors (trailing commas, etc)
+        if text.endswith(','):
+            text = text[:-1]
+        return jsonify(json.loads(text))
+    except Exception as e:
+        print(f"Quiz Generation Error: {e}")
+        # BETTER FALLBACK: Specific to the topic so it doesn't look broken
+        return jsonify([
+            {"question": f"Which of the following best describes {sub_topic}?", "options": [
+                "A fundamental concept", "A deprecated tool", "A hardware component", "None of the above"], "correct_answer": 0},
+            {"question": "Why is this concept important?", "options": [
+                "Efficiency", "Cost", "Color", "Taste"], "correct_answer": 0},
+            {"question": "In a real-world scenario, when would you use this?",
+                "options": ["Always", "Never", "Depends on data", "Randomly"], "correct_answer": 2},
+            {"question": "What is a common pitfall?", "options": [
+                "Overfitting", "Under-usage", "Too fast", "Too slow"], "correct_answer": 0},
+            {"question": "Advanced: How does this interact with other systems?", "options": [
+                "Seamlessly", "Poorly", "Via API", "Manually"], "correct_answer": 2}
+        ])
 
 # --- LOGIC 3: SMART RESOURCES (No Shorts + Real PDFs) ---
 
@@ -75,27 +164,26 @@ def get_quiz():
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
     topic = request.args.get('topic')
-    print(f"🔎 Searching for: {topic}")
+    print(f"🔎 Searching resources for: {topic}")
+
+    videos = []
+    pdfs = []
 
     # 1. YouTube (Filter Shorts)
-    videos = []
     if youtube_client:
         try:
-            # Step A: Search for IDs
             search_res = youtube_client.search().list(
                 part="id", q=f"{topic} tutorial", type="video", maxResults=10
             ).execute()
 
             video_ids = [item['id']['videoId'] for item in search_res['items']]
 
-            # Step B: Get Details (Duration)
             details_res = youtube_client.videos().list(
                 part="snippet,contentDetails", id=','.join(video_ids)
             ).execute()
 
             for item in details_res['items']:
                 duration = item['contentDetails']['duration']
-                # ONLY add if NOT a short (> 60s)
                 if not is_short(duration):
                     videos.append({
                         "title": item['snippet']['title'],
@@ -104,34 +192,27 @@ def get_resources():
                         "channel": item['snippet']['channelTitle']
                     })
                     if len(videos) >= 4:
-                        break  # Stop after 4 good videos
-
+                        break
         except Exception as e:
             print(f"YT Error: {e}")
 
-    # 2. PDFs & Articles (DuckDuckGo with Fallback)
-    pdfs = []
+    # 2. PDFs & Articles (DuckDuckGo)
     try:
         with DDGS() as ddgs:
             # PDF Search
-            results = list(ddgs.text(f"{topic} filetype:pdf", maxResults=3))
-            for r in results:
+            for r in ddgs.text(f"{topic} filetype:pdf", maxResults=3):
                 pdfs.append(
                     {"title": r['title'], "url": r['href'], "type": "PDF"})
-
             # Article Search
-            results = list(
-                ddgs.text(f"{topic} site:geeksforgeeks.org OR site:medium.com", maxResults=2))
-            for r in results:
+            for r in ddgs.text(f"{topic} site:geeksforgeeks.org OR site:medium.com", maxResults=2):
                 pdfs.append(
                     {"title": r['title'], "url": r['href'], "type": "Article"})
-
     except Exception as e:
         print(f"Search Error: {e}")
-        # FALLBACK: If scraping fails, give a Google Search Link
+        # Fallback Link
         pdfs.append({
-            "title": f"Find '{topic}' PDFs on Google",
-            "url": f"https://www.google.com/search?q={topic}+filetype:pdf",
+            "title": f"Search '{topic}' on Google",
+            "url": f"https://www.google.com/search?q={topic}+tutorial",
             "type": "Search"
         })
 
