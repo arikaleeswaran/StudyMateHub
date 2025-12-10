@@ -104,6 +104,21 @@ def get_roadmap():
 
     return jsonify(data)
 
+
+@app.route('/api/save_roadmap', methods=['POST'])
+def save_roadmap():
+    data = request.json
+    try:
+        # Simply insert whatever user_id the frontend sends
+        supabase.table('user_roadmaps').insert({
+            "user_id": data.get('user_id'),
+            "topic": data.get('topic'),
+            "graph_data": data.get('graph_data')
+        }).execute()
+        return jsonify({"message": "Saved"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # --- LOGIC 2: 5-QUESTION ADAPTIVE QUIZ ---
 
 

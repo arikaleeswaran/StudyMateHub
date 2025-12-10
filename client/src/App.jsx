@@ -1,16 +1,24 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import Navbar from './components/Navbar'; // <--- Import Navbar
 import HomePage from './pages/HomePage';
-import RoadmapGraph from './pages/RoadmapGraph'; // <--- NEW NAME
+import RoadmapGraph from './pages/RoadmapGraph';
+import AuthPage from './pages/AuthPage';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        {/* Update the element below */}
-        <Route path="/roadmap/:topic" element={<RoadmapGraph />} /> 
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Navbar /> {/* <--- Place it here, inside Router but outside Routes */}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/roadmap/:topic" element={<RoadmapGraph />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

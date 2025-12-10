@@ -5,8 +5,12 @@ import { getRoadmap } from '../services/api';
 import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function RoadmapGraph() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { topic } = useParams();
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -110,12 +114,43 @@ function RoadmapGraph() {
       )
   }
 
+  const handleSaveRoadmap = async () => {
+  if (!user) {
+    alert("Please login to save roadmaps!");
+    navigate('/auth');
+    return;
+  }
+
+  try {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+    await axios.post(`${baseUrl}/api/save_roadmap`, {
+        user_id: user.id, // REAL ID
+        topic: topic,
+        graph_data: { nodes: nodes }
+    });
+    alert("Roadmap saved to your profile! 💾");
+  } catch (error) {
+    console.error(error);
+    alert("Failed to save.");
+  }
+};
+
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
       
       {/* HEADER */}
       <div style={{ padding: '20px', borderBottom: '1px solid #eee', textAlign: 'center', background: '#fafafa', position:'sticky', top:0, zIndex:50 }}>
         <h2 style={{ margin: 0, color: '#333', textTransform: 'capitalize' }}>🗺️ Path: <span style={{color: '#007bff'}}>{topic}</span></h2>
+        <button 
+    onClick={handleSaveRoadmap}
+    style={{
+      position: 'absolute', right: '30px', top: '20px',
+      padding: '10px 20px', background: '#28a745', color: 'white',
+      border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'
+    }}
+  >
+    💾 Save Path
+  </button>
       </div>
 
       {/* GRAPH CONTAINER */}
