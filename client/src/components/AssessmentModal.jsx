@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown'; // NEW
+import remarkMath from 'remark-math';       // NEW
+import rehypeKatex from 'rehype-katex';     // NEW
+import 'katex/dist/katex.min.css';          // NEW
 
 function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
   const [questions, setQuestions] = useState([]);
@@ -21,9 +25,8 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
             throw new Error("No data");
         }
       } catch (err) {
-        console.error(err);
-        // Emergency Fallback
-        setQuestions([{ question: "Could not generate quiz.", options: ["OK"], correct_answer: 0 }]);
+        // Fallback
+        setQuestions([{ question: "Could not generate quiz. Check connection.", options: ["OK"], correct_answer: 0 }]);
       } finally {
         setLoading(false);
       }
@@ -35,7 +38,6 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
     if (optionIndex === questions[currentQ].correct_answer) {
       setScore(prev => prev + 1);
     }
-    
     if (currentQ + 1 < questions.length) {
       setCurrentQ(prev => prev + 1);
     } else {
@@ -47,7 +49,6 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
     onComplete(score, feedbackText);
   };
 
-  // Determine Difficulty Label
   const getDifficulty = (index) => {
       if (index < 2) return { label: "Easy", color: "#28a745" };
       if (index < 4) return { label: "Medium", color: "#ffc107" };
@@ -67,11 +68,10 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card" style={{ maxWidth: '650px', padding: '0', overflow: 'hidden' }}>
+      <div className="modal-card" style={{ maxWidth: '700px', padding: '0', overflow: 'hidden', textAlign:'left' }}>
         
         {!quizFinished ? (
           <>
-            {/* HEADER with Progress */}
             <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {subTopic}</h3>
                 <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: difficulty.color, background: '#fff', padding: '4px 10px', borderRadius: '12px', border: `1px solid ${difficulty.color}` }}>
@@ -79,21 +79,31 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
                 </span>
             </div>
             
-            {/* PROGRESS BAR */}
             <div style={{ width: '100%', height: '6px', background: '#eee' }}>
                 <div style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, height: '100%', background: '#007bff', transition: 'width 0.3s ease' }}></div>
             </div>
 
             <div style={{ padding: '30px' }}>
-                <h2 style={{ fontSize: '1.4rem', marginBottom: '25px', lineHeight: '1.4', textAlign: 'left' }}>
-                    {questions[currentQ].question}
-                </h2>
+                {/* RENDER QUESTION WITH MARKDOWN & MATH SUPPORT */}
+                <div style={{ fontSize: '1.3rem', marginBottom: '25px', lineHeight: '1.6', color:'#222' }}>
+                    <ReactMarkdown 
+                        remarkPlugins={[remarkMath]} 
+                        rehypePlugins={[rehypeKatex]}
+                    >
+                        {questions[currentQ].question}
+                    </ReactMarkdown>
+                </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {questions[currentQ].options.map((opt, i) => (
                         <button key={i} onClick={() => handleAnswer(i)} className="quiz-option">
-                            <span style={{ fontWeight: 'bold', color: '#007bff', marginRight: '10px' }}>{String.fromCharCode(65 + i)}</span>
-                            {opt}
+                            <span style={{ fontWeight: 'bold', color: '#007bff', marginRight: '15px' }}>{String.fromCharCode(65 + i)}</span>
+                            {/* Render Options with Math too */}
+                            <span>
+                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                    {opt}
+                                </ReactMarkdown>
+                            </span>
                         </button>
                     ))}
                 </div>
@@ -105,35 +115,27 @@ function AssessmentModal({ mainTopic, subTopic, onClose, onComplete }) {
           </>
         ) : (
           /* RESULT SCREEN */
-          <div style={{ padding: '40px' }}>
+          <div style={{ padding: '40px', textAlign:'center' }}>
             <div style={{ fontSize: '4rem', marginBottom: '10px' }}>
                 {score >= 3 ? "🏆" : "💪"}
             </div>
-            
             <h1 style={{ margin: '10px 0', color: '#333' }}>
                 {score >= 3 ? "Knowledge Verified!" : "Keep Learning!"}
             </h1>
-            
             <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '30px' }}>
                 You scored <strong>{score} / {questions.length}</strong> correct.
             </p>
-
             <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '20px 0' }} />
-
             <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>
                 How was this quiz? (Optional Feedback)
             </label>
             <textarea 
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="Questions were too easy / ambiguous..."
               style={{ width: '100%', height: '80px', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit', resize: 'none' }}
             />
-
             <div style={{ display: 'flex', gap: '15px', marginTop: '25px' }}>
-               <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#e9ecef', color: '#333', fontWeight: 'bold', cursor: 'pointer' }}>
-                 Close
-               </button>
+               <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#e9ecef', color: '#333', fontWeight: 'bold', cursor: 'pointer' }}>Close</button>
                <button onClick={handleSubmit} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: '#007bff', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>
                  {score >= 3 ? "Continue Path" : "View Resources"}
                </button>

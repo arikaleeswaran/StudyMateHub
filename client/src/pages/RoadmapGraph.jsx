@@ -14,11 +14,13 @@ function RoadmapGraph() {
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [resources, setResources] = useState({ videos: [], pdfs: [] });
+  
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [checkNode, setCheckNode] = useState(null);
   const [loadingResources, setLoadingResources] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
+  
   const mapFetched = useRef(false);
 
   useEffect(() => {
@@ -41,9 +43,7 @@ function RoadmapGraph() {
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_roadmap`, {
-            user_id: user.id, 
-            topic: topic, 
-            graph_data: { nodes: nodes }
+            user_id: user.id, topic: topic, graph_data: { nodes: nodes }
         });
         alert("Roadmap saved to profile!");
     } catch (e) { alert("Already exists or error saving."); }
@@ -73,15 +73,31 @@ function RoadmapGraph() {
   const handleKnowsTopic = () => { setShowCheckModal(false); setShowQuizModal(true); };
   const handleNewTopic = () => { setShowCheckModal(false); fetchResources(checkNode); };
   
+  // --- FIXED THIS FUNCTION ---
   const handleQuizComplete = async (score, feedback) => {
     setShowQuizModal(false);
-    alert(`Score: ${score}/5 Saved!`);
+    
+    // 1. Save to Database
     if(user) {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        await axios.post(`${baseUrl}/api/submit_progress`, {
-            user_id: user.id, node_label: checkNode.label, score, feedback
-        });
+        try {
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+            await axios.post(`${baseUrl}/api/submit_progress`, {
+                user_id: user.id,
+                topic: topic, // Important!
+                node_label: checkNode.label,
+                score: score,
+                feedback: feedback
+            });
+            alert(`Score: ${score}/5 Saved to Profile! 🏆`);
+        } catch(e) {
+            console.error(e);
+            alert("Score not saved (Error)");
+        }
+    } else {
+        alert(`Score: ${score}/5 (Login to save)`);
     }
+
+    // 2. Show Resources
     fetchResources(checkNode);
   };
 
