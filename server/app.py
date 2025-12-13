@@ -1,14 +1,15 @@
 import os
 import json
-import isodate
 import re
+import requests
+import urllib.parse
+from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from groq import Groq
 from googleapiclient.discovery import build
-from duckduckgo_search import DDGS
 from textblob import TextBlob
 
 load_dotenv()
@@ -39,57 +40,171 @@ try:
 except:
     youtube_client = None
 
-# --- CRITICAL HELPER: BULLETPROOF JSON PARSER ---
 
-
+# --- HELPER 1: JSON PARSER ---
 def parse_json_safely(text, expected_type="dict"):
-    print(f"🔍 Raw AI Response: {text[:100]}...")  # Debug Print
-
-    # 1. Strip Markdown (```json ... ```)
     text = re.sub(r'```json\s*', '', text)
     text = re.sub(r'```', '', text)
     text = text.strip()
-
-    # 2. Extract strictly the JSON part (ignore "Here is the JSON...")
     try:
         if expected_type == "list":
-            # Find the first '[' and last ']'
             start = text.find('[')
             end = text.rfind(']') + 1
             if start != -1 and end != -1:
                 text = text[start:end]
         else:
-            # Find the first '{' and last '}'
             start = text.find('{')
             end = text.rfind('}') + 1
             if start != -1 and end != -1:
                 text = text[start:end]
     except:
         pass
-
-    # 3. Try Parsing
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
-        # 4. If failed, try "Math Fix" (Escape backslashes for LaTeX)
+    except:
         try:
-            # This fixes "Invalid \escape" caused by things like \theta
-            fixed_text = text.replace('\\', '\\\\')
-            return json.loads(fixed_text)
+            return json.loads(text.replace('\\', '\\\\'))
         except:
-            print("❌ JSON Parsing Failed completely.")
             return None
 
+# --- HELPER 2: YOUTUBE (Fixed "Only 2 Videos" Issue) ---
 
-def is_short(duration_iso):
+
+def get_youtube_videos(topic, max_results=5):
+    if not youtube_client:
+        return []
     try:
-        dur = isodate.parse_duration(duration_iso)
-        return dur.total_seconds() < 60
+        # FETCH 15 items first (to account for Shorts we will filter out)
+        search_request = youtube_client.search().list(
+            q=f"{topic} tutorial", part='snippet', type='video',
+            maxResults=15, relevanceLanguage='en', videoCategoryId='27'
+        )
+        search_response = search_request.execute()
+        video_ids = [item['id']['videoId']
+                     for item in search_response.get('items', [])]
+
+        if not video_ids:
+            return []
+
+        video_details = youtube_client.videos().list(
+            part='snippet,contentDetails', id=','.join(video_ids)).execute()
+        videos = []
+
+        for item in video_details.get('items', []):
+            if len(videos) >= max_results:
+                break  # Stop once we have enough
+
+            duration_str = item['contentDetails']['duration']
+            match = re.match(
+                r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_str)
+            if match:
+                hours = int(match.group(1)) if match.group(1) else 0
+                minutes = int(match.group(2)) if match.group(2) else 0
+                seconds = int(match.group(3)) if match.group(3) else 0
+                total_seconds = hours * 3600 + minutes * 60 + seconds
+
+                # Filter Shorts (> 60s)
+                if total_seconds > 60:
+                    videos.append({
+                        "title": item['snippet']['title'],
+                        "url": f"https://www.youtube.com/watch?v={item['id']}",
+                        "thumbnail": item['snippet']['thumbnails']['medium']['url'],
+                        "channel": item['snippet']['channelTitle'],
+                        "type": "video"
+                    })
+        return videos
+    except Exception as e:
+        return []
+
+# --- HELPER 3: ARTICLE SCRAPER (GFG, W3Schools, Medium) ---
+
+
+def scrape_articles(topic, max_results=4):
+    url = f"https://html.duckduckgo.com/html/?q={topic} tutorial geeksforgeeks w3schools medium"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0'}
+    articles = []
+
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            for item in soup.find_all('div', class_='result', limit=max_results):
+                title = item.find('a', class_='result__a')
+                snippet = item.find('a', class_='result__snippet')
+                if title and snippet:
+                    articles.append({
+                        "title": title.text,
+                        "url": title['href'],
+                        "snippet": snippet.text,
+                        "type": "article"
+                    })
     except:
-        return False
+        pass
+
+    # STRONG FALLBACK (If scraping fails, return these guaranteed links)
+    if not articles:
+        safe_topic = topic.replace(' ', '-').lower()
+        articles = [
+            {"title": f"GeeksforGeeks: {topic} Guide",
+                "url": f"https://www.geeksforgeeks.org/{safe_topic}/", "type": "article"},
+            {"title": f"W3Schools: Learn {topic}",
+                "url": f"https://www.w3schools.com/{safe_topic}/", "type": "article"},
+            {"title": f"Medium: {topic} Concepts",
+                "url": f"https://medium.com/tag/{safe_topic}", "type": "article"},
+            {"title": f"Dev.to: {topic} Tutorials",
+                "url": f"https://dev.to/t/{safe_topic}", "type": "article"}
+        ]
+    return articles
+
+# --- HELPER 4: PDF/CHEAT SHEETS (No Research Papers) ---
+
+
+def get_pdfs(topic, max_results=4):
+    pdfs = []
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    search_queries = [f"{topic} cheat sheet filetype:pdf",
+                      f"{topic} lecture notes filetype:pdf"]
+    for query in search_queries:
+        if len(pdfs) >= 3:
+            break
+        try:
+            url = f"https://html.duckduckgo.com/html/?q={query}"
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                for item in soup.find_all('div', class_='result', limit=2):
+                    title_el = item.find('a', class_='result__a')
+                    if title_el:
+                        title_text = title_el.text
+                        if "PDF" not in title_text:
+                            title_text = f"[PDF] {title_text}"
+                        pdfs.append(
+                            {"title": title_text, "url": title_el['href'], "type": "PDF"})
+        except:
+            pass
+
+    # Fallback Shortcuts
+    safe_topic = urllib.parse.quote(topic)
+    if len(pdfs) < 4:
+        smart_links = [
+            {"title": f"🔍 {topic} Cheat Sheet (Google)",
+             "url": f"https://www.google.com/search?q={safe_topic}+cheat+sheet+filetype:pdf", "type": "PDF"},
+            {"title": f"🎓 {topic} Lecture Notes (PDF)",
+             "url": f"https://www.google.com/search?q={safe_topic}+lecture+notes+filetype:pdf", "type": "PDF"},
+            {"title": f"📝 {topic} Interview Qs (PDF)",
+             "url": f"https://www.google.com/search?q={safe_topic}+interview+questions+filetype:pdf", "type": "PDF"}
+        ]
+        for link in smart_links:
+            if len(pdfs) >= max_results:
+                break
+            pdfs.append(link)
+
+    return pdfs
+
 
 # --- ROUTES ---
-
 
 @app.route('/api/save_roadmap', methods=['POST'])
 def save_roadmap():
@@ -105,8 +220,7 @@ def save_roadmap():
                 "graph_data": data.get('graph_data')
             }).execute()
             return jsonify({"message": "Roadmap Saved!"})
-        else:
-            return jsonify({"message": "Roadmap already exists."})
+        return jsonify({"message": "Roadmap already exists."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -148,128 +262,57 @@ def submit_progress():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- AI GENERATORS (Groq) ---
+# --- AI ENDPOINTS ---
 
 
 @app.route('/api/roadmap', methods=['GET'])
 def get_roadmap():
     topic = request.args.get('topic', '').strip().title()
-
-    # 1. Check DB First
     try:
         existing = supabase.table('user_roadmaps').select(
             'graph_data').eq('topic', topic).limit(1).execute()
         if existing.data:
-            print("📂 Loaded from DB")
             return jsonify(existing.data[0]['graph_data'])
     except:
         pass
 
-    # 2. Generate New
-    print(f"🚀 Generating Roadmap: {topic}...")
-    prompt = f"""
-    Create a linear 7-step learning path for '{topic}'.
-    Return strict JSON (no extra text) in this format:
-    {{ "nodes": [ {{"id": "1", "label": "Basics"}}, {{"id": "2", "label": "..."}} ] }}
-    """
+    prompt = f"""Create a linear 7-step learning path for '{topic}'. Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}"""
     try:
         completion = groq_client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            response_format={"type": "json_object"}
+            model=GROQ_MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"}
         )
         data = parse_json_safely(completion.choices[0].message.content, "dict")
         return jsonify(data if data else {"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
     except Exception as e:
-        print(f"❌ Groq Error: {e}")
         return jsonify({"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
 
 
 @app.route('/api/quiz', methods=['GET'])
 def get_quiz():
-    main = request.args.get('main_topic')
-    sub = request.args.get('sub_topic')
-    print(f"🧠 Generating Quiz: {sub}...")
-
-    prompt = f"""
-    Create 5 multiple-choice questions for '{sub}' (Context: {main}).
-    Return a strict JSON Array (no extra text) like this:
-    [
-      {{
-        "question": "Question?",
-        "options": ["A", "B", "C", "D"],
-        "correct_answer": 0
-      }}
-    ]
-    """
+    main, sub = request.args.get('main_topic'), request.args.get('sub_topic')
+    prompt = f"""Create 5 multiple-choice questions for '{sub}' (Context: {main}). JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
     try:
         completion = groq_client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            response_format={"type": "json_object"}
+            model=GROQ_MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"}
         )
-
-        # Groq might wrap the array in an object like {"data": [...]}. Let's handle it.
-        raw_text = completion.choices[0].message.content
-        data = parse_json_safely(raw_text, "list")
-
-        # If data came back as a Dictionary (e.g. {"questions": [...]}), extract the list
+        data = parse_json_safely(completion.choices[0].message.content, "list")
         if isinstance(data, dict):
-            for key in data:
-                if isinstance(data[key], list):
-                    return jsonify(data[key])
-            return jsonify([])  # No list found
-
+            for k in data:
+                if isinstance(data[k], list):
+                    return jsonify(data[k])
         return jsonify(data if data else [])
-
-    except Exception as e:
-        print(f"❌ Groq Quiz Error: {e}")
-        # Valid Fallback Quiz (Prevents Option A/B)
-        return jsonify([
-            {"question": f"What is the main concept of {sub}?", "options": [
-                "Concept A", "Concept B", "Concept C", "Concept D"], "correct_answer": 0},
-            {"question": "True or False: This is essential.",
-                "options": ["True", "False"], "correct_answer": 0},
-            {"question": "Which fits best?", "options": [
-                "Option 1", "Option 2", "Option 3", "Option 4"], "correct_answer": 0},
-            {"question": "Why use this?", "options": [
-                "Efficiency", "Cost", "Speed", "All of above"], "correct_answer": 3},
-            {"question": "Advanced Check", "options": [
-                "A", "B", "C", "D"], "correct_answer": 0}
-        ])
+    except:
+        return jsonify([{"question": "Quiz Generation Failed", "options": ["OK"], "correct_answer": 0}])
 
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
     topic = request.args.get('topic')
-    videos, pdfs = [], []
-    if youtube_client:
-        try:
-            search = youtube_client.search().list(
-                part="id", q=f"{topic} tutorial", type="video", maxResults=5).execute()
-            ids = [i['id']['videoId'] for i in search['items']]
-            details = youtube_client.videos().list(
-                part="snippet,contentDetails", id=','.join(ids)).execute()
-            for item in details['items']:
-                if not is_short(item['contentDetails']['duration']):
-                    videos.append({
-                        "title": item['snippet']['title'],
-                        "url": f"https://www.youtube.com/watch?v={item['id']}",
-                        "thumbnail": item['snippet']['thumbnails']['medium']['url'],
-                        "channel": item['snippet']['channelTitle']
-                    })
-        except:
-            pass
-    try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(f"{topic} filetype:pdf", maxResults=3):
-                pdfs.append(
-                    {"title": r['title'], "url": r['href'], "type": "PDF"})
-    except:
-        pass
-    return jsonify({"videos": videos, "pdfs": pdfs})
+    return jsonify({
+        "videos": get_youtube_videos(topic),
+        "articles": scrape_articles(topic),  # Now includes GFG/W3Schools
+        "pdfs": get_pdfs(topic)
+    })
 
 
 if __name__ == '__main__':
