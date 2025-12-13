@@ -289,17 +289,34 @@ def get_roadmap():
 
 @app.route('/api/quiz', methods=['GET'])
 def get_quiz():
-    main, sub = request.args.get('main_topic'), request.args.get('sub_topic')
-    prompt = f"""Create 5 multiple-choice questions for '{sub}' (Context: {main}). JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
+    main = request.args.get('main_topic')
+    sub = request.args.get('sub_topic')
+    # Default to 10, but allow requesting 5
+    num_questions = request.args.get('num', '10')
+
+    print(f"🧠 Generating {num_questions}-Question Quiz: {sub}...")
+
+    prompt = f"""
+    Create a {num_questions}-question multiple-choice assessment for '{sub}' (Context: {main}).
+    STRICT RULES:
+    1. Return strictly a JSON Array.
+    2. Difficulty: Mix of Conceptual and Practical.
+    3. Format: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]
+    """
     try:
         completion = groq_client.chat.completions.create(
-            model=GROQ_MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"}
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            response_format={"type": "json_object"}
         )
         data = parse_json_safely(completion.choices[0].message.content, "list")
+
         if isinstance(data, dict):
             for k in data:
                 if isinstance(data[k], list):
                     return jsonify(data[k])
+
         return jsonify(data if data else [])
     except:
         return jsonify([{"question": "Quiz Generation Failed", "options": ["OK"], "correct_answer": 0}])
