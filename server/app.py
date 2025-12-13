@@ -314,6 +314,31 @@ def get_resources():
         "pdfs": get_pdfs(topic)
     })
 
+# --- DELETE APIs ---
+
+
+@app.route('/api/delete_roadmap', methods=['DELETE'])
+def delete_roadmap():
+    user_id = request.args.get('user_id')
+    topic = request.args.get('topic')
+    try:
+        # Delete the roadmap graph entry
+        supabase.table('user_roadmaps').delete().eq(
+            'user_id', user_id).eq('topic', topic).execute()
+        return jsonify({"message": "Roadmap deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/delete_resource', methods=['DELETE'])
+def delete_resource():
+    res_id = request.args.get('id')
+    try:
+        supabase.table('saved_resources').delete().eq('id', res_id).execute()
+        return jsonify({"message": "Resource deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

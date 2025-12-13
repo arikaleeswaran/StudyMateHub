@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import { useNavigate } from 'react-router-dom';
-import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook } from 'react-icons/fa';
+import axios from 'axios'; // Import Axios for Deleting
+import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash } from 'react-icons/fa';
 
 function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -13,7 +14,6 @@ function ProfilePage() {
   const [expandedFolders, setExpandedFolders] = useState({});
   const [activeTab, setActiveTab] = useState('library');
   const [loading, setLoading] = useState(true);
-  const [debugMsg, setDebugMsg] = useState(""); // Debug info
 
   useEffect(() => {
     if (user) fetchData();
@@ -21,40 +21,26 @@ function ProfilePage() {
 
   const fetchData = async () => {
     setLoading(true);
-    setDebugMsg("Starting fetch...");
     try {
-        console.log("Fetching for User:", user.id);
-
-        // FIX: Used .from() instead of .table()
         const roadmaps = await supabase.from('user_roadmaps').select('*').eq('user_id', user.id);
         const resources = await supabase.from('saved_resources').select('*').eq('user_id', user.id);
         const scores = await supabase.from('node_progress').select('*').eq('user_id', user.id).order('created_at', {ascending: false});
-
-        // DEBUG LOGGING
-        const log = `
-        User ID: ${user.id}
-        Roadmaps: ${roadmaps.data?.length || 0} found
-        Resources: ${resources.data?.length || 0} found
-        Scores: ${scores.data?.length || 0} found
-        Errors: ${roadmaps.error?.message || resources.error?.message || scores.error?.message || "None"}
-        `;
-        setDebugMsg(log);
-        console.log("Data:", { roadmaps, resources, scores });
 
         setAllScores(scores.data || []);
 
         const grouped = {};
         
-        // 1. Folders
+        // 1. Folders (Roadmaps)
         roadmaps.data?.forEach(r => {
-            const key = r.topic; // Backend saves as Title Case now
-            if (!grouped[key]) grouped[key] = { subfolders: {} };
+            const key = r.topic;
+            if (!grouped[key]) grouped[key] = { hasRoadmap: true, subfolders: {} };
+            else grouped[key].hasRoadmap = true;
         });
 
         // 2. Resources
         resources.data?.forEach(r => {
             const key = r.roadmap_topic;
-            if (!grouped[key]) grouped[key] = { subfolders: {} };
+            if (!grouped[key]) grouped[key] = { hasRoadmap: false, subfolders: {} };
             if (!grouped[key].subfolders[r.node_label]) {
                 grouped[key].subfolders[r.node_label] = { resources: [], scores: [] };
             }
@@ -64,9 +50,8 @@ function ProfilePage() {
         // 3. Scores
         scores.data?.forEach(s => {
             const key = s.topic; 
-            // Only add score if we know the topic
             if (key) {
-                if (!grouped[key]) grouped[key] = { subfolders: {} };
+                if (!grouped[key]) grouped[key] = { hasRoadmap: false, subfolders: {} };
                 if (!grouped[key].subfolders[s.node_label]) {
                     grouped[key].subfolders[s.node_label] = { resources: [], scores: [] };
                 }
@@ -77,10 +62,27 @@ function ProfilePage() {
         setFolders(grouped);
     } catch (error) {
         console.error("Error:", error);
-        setDebugMsg("CRITICAL ERROR: " + error.message);
     } finally {
         setLoading(false);
     }
+  };
+
+  const handleDeleteRoadmap = async (topic) => {
+    if(!window.confirm(`Are you sure you want to delete the "${topic}" roadmap?`)) return;
+    try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        await axios.delete(`${baseUrl}/api/delete_roadmap?user_id=${user.id}&topic=${topic}`);
+        fetchData(); // Refresh
+    } catch(e) { alert("Error deleting roadmap"); }
+  };
+
+  const handleDeleteResource = async (id) => {
+    if(!window.confirm("Delete this resource?")) return;
+    try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        await axios.delete(`${baseUrl}/api/delete_resource?id=${id}`);
+        fetchData(); // Refresh
+    } catch(e) { alert("Error deleting resource"); }
   };
 
   const toggleFolder = (topic) => setExpandedFolders(prev => ({ ...prev, [topic]: !prev[topic] }));
@@ -89,7 +91,7 @@ function ProfilePage() {
   return (
     <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto', fontFamily: 'Segoe UI' }}>
       
-      {/* HEADER */}
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
             <button onClick={() => navigate(-1)} style={{background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer', color:'#555'}} title="Go Back"><FaArrowLeft/></button>
@@ -98,13 +100,7 @@ function ProfilePage() {
         <button onClick={handleLogout} style={{ padding: '8px 15px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Logout</button>
       </div>
 
-      {/* DEBUG BOX - Remove this later */}
-      <div style={{background:'#333', color:'#0f0', padding:'15px', marginBottom:'20px', borderRadius:'5px', fontFamily:'monospace', whiteSpace:'pre-wrap'}}>
-        <strong>🛠️ DEBUG STATUS:</strong>
-        {debugMsg}
-      </div>
-
-      {/* TABS */}
+      {/* Tabs */}
       <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid #eee'}}>
           <button onClick={() => setActiveTab('library')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'library' ? '3px solid #007bff' : 'none', fontWeight:'bold', color: activeTab === 'library' ? '#007bff' : '#555', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaBook/> My Library</button>
           <button onClick={() => setActiveTab('assessments')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'assessments' ? '3px solid #007bff' : 'none', fontWeight:'bold', color: activeTab === 'assessments' ? '#007bff' : '#555', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaChartBar/> My Assessments</button>
@@ -112,38 +108,57 @@ function ProfilePage() {
 
       {loading ? <p>Loading...</p> : (
           activeTab === 'library' ? (
-              // LIBRARY VIEW
               Object.keys(folders).length === 0 ? <div style={{textAlign:'center', padding:'50px', background:'#f9f9f9'}}><h3>No Saved Content 📂</h3></div> :
               <div>
                   {Object.keys(folders).map(topic => (
                       <div key={topic} style={{ marginBottom: '20px', border: '1px solid #eee', borderRadius: '10px', overflow:'hidden' }}>
-                          <div onClick={() => toggleFolder(topic)} style={{ padding: '20px', background: '#f8f9fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '15px', fontWeight: 'bold' }}>
-                              {expandedFolders[topic] ? <FaFolderOpen color="#ffc107" size={24}/> : <FaFolder color="#ffc107" size={24}/>}
-                              <span style={{fontSize:'1.1rem', textTransform:'capitalize'}}>{topic}</span>
-                              <span style={{marginLeft:'auto', color:'#999'}}>{expandedFolders[topic] ? <FaChevronDown/> : <FaChevronRight/>}</span>
+                          <div style={{ padding: '20px', background: '#f8f9fa', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                              
+                              {/* Toggle Click Area */}
+                              <div onClick={() => toggleFolder(topic)} style={{display:'flex', alignItems:'center', gap:'15px', flex:1, cursor:'pointer', fontWeight:'bold'}}>
+                                {expandedFolders[topic] ? <FaFolderOpen color="#ffc107" size={24}/> : <FaFolder color="#ffc107" size={24}/>}
+                                <span style={{fontSize:'1.1rem', textTransform:'capitalize'}}>{topic}</span>
+                                <span style={{marginLeft:'auto', color:'#999', marginRight:'10px'}}>{expandedFolders[topic] ? <FaChevronDown/> : <FaChevronRight/>}</span>
+                              </div>
+
+                              {/* Delete Folder Button (Only if roadmap exists) */}
+                              {folders[topic].hasRoadmap && (
+                                <button onClick={() => handleDeleteRoadmap(topic)} style={{background:'none', border:'none', cursor:'pointer', color:'#dc3545'}} title="Delete Roadmap Path">
+                                    <FaTrash />
+                                </button>
+                              )}
                           </div>
+
                           {expandedFolders[topic] && (
                               <div style={{ padding: '20px', background: 'white' }}>
-                                  <button onClick={() => navigate(`/roadmap/${topic}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
-                                  
+                                  {/* View Map Button */}
+                                  {folders[topic].hasRoadmap && (
+                                      <button onClick={() => navigate(`/roadmap/${topic}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
+                                  )}
+
                                   {Object.keys(folders[topic].subfolders).map(subNode => (
                                       <div key={subNode} style={{ marginLeft: '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: '3px solid #eee' }}>
                                           <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>📁 {subNode}</h4>
                                           
-                                          {/* Scores in Folder */}
+                                          {/* Scores */}
                                           {folders[topic].subfolders[subNode].scores.map((s, i) => (
                                               <div key={i} style={{display:'inline-block', padding:'5px 10px', background:'#e8f5e9', color:'green', borderRadius:'15px', fontSize:'0.8rem', marginRight:'10px', marginBottom:'10px'}}>
                                                   <FaStar/> Score: {s.quiz_score}/5
                                               </div>
                                           ))}
 
-                                          {/* Resources in Folder */}
+                                          {/* Resources List */}
                                           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
                                               {folders[topic].subfolders[subNode].resources.map(res => (
-                                                  <a key={res.id} href={res.url} target="_blank" rel="noreferrer" style={{display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'white', border:'1px solid #eee', borderRadius:'8px', textDecoration:'none', color:'#333', fontSize:'0.9rem'}}>
-                                                      {res.resource_type === 'video' ? <FaVideo color="#d32f2f"/> : <FaFilePdf color="#2e7d32"/>}
-                                                      <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
-                                                  </a>
+                                                  <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'white', border:'1px solid #eee', borderRadius:'8px'}}>
+                                                      <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'#333', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
+                                                          {res.resource_type === 'video' ? <FaVideo color="#d32f2f"/> : res.resource_type === 'article' ? <FaGlobe color="#28a745"/> : <FaFilePdf color="#ffc107"/>}
+                                                          <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
+                                                      </a>
+                                                      <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#ccc', padding:'0 5px'}} title="Remove">
+                                                          <FaTrash size={12}/>
+                                                      </button>
+                                                  </div>
                                               ))}
                                           </div>
                                       </div>
@@ -154,7 +169,7 @@ function ProfilePage() {
                   ))}
               </div>
           ) : (
-              // ASSESSMENTS VIEW
+              // Assessments Tab
               <div>
                   {allScores.length === 0 ? <p>No assessments taken yet.</p> : (
                       <div style={{display:'grid', gap:'15px'}}>
