@@ -1,45 +1,84 @@
 import os
 import json
 import isodate
+import re
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from supabase import create_client, Client
-import google.generativeai as genai
+from groq import Groq
 from googleapiclient.discovery import build
 from duckduckgo_search import DDGS
 from textblob import TextBlob
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Keys & Clients
+# --- CONFIGURATION ---
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+# 1. Supabase
 try:
     supabase: Client = create_client(os.environ.get(
         "SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 except:
     print("⚠️ Supabase Keys missing.")
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel('models/gemini-flash-latest')
+# 2. Groq
+try:
+    groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    print(f"✅ Groq Client Initialized (Model: {GROQ_MODEL})")
+except Exception as e:
+    print(f"⚠️ Groq Init Error: {e}")
 
-# --- SAFETY SETTINGS (DISABLE FILTERS) ---
-safety_settings = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
-
+# 3. YouTube
 try:
     youtube_client = build(
         'youtube', 'v3', developerKey=os.environ.get("YOUTUBE_API_KEY"))
 except:
     youtube_client = None
 
-# --- HELPER ---
+# --- CRITICAL HELPER: BULLETPROOF JSON PARSER ---
+
+
+def parse_json_safely(text, expected_type="dict"):
+    print(f"🔍 Raw AI Response: {text[:100]}...")  # Debug Print
+
+    # 1. Strip Markdown (```json ... ```)
+    text = re.sub(r'```json\s*', '', text)
+    text = re.sub(r'```', '', text)
+    text = text.strip()
+
+    # 2. Extract strictly the JSON part (ignore "Here is the JSON...")
+    try:
+        if expected_type == "list":
+            # Find the first '[' and last ']'
+            start = text.find('[')
+            end = text.rfind(']') + 1
+            if start != -1 and end != -1:
+                text = text[start:end]
+        else:
+            # Find the first '{' and last '}'
+            start = text.find('{')
+            end = text.rfind('}') + 1
+            if start != -1 and end != -1:
+                text = text[start:end]
+    except:
+        pass
+
+    # 3. Try Parsing
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # 4. If failed, try "Math Fix" (Escape backslashes for LaTeX)
+        try:
+            # This fixes "Invalid \escape" caused by things like \theta
+            fixed_text = text.replace('\\', '\\\\')
+            return json.loads(fixed_text)
+        except:
+            print("❌ JSON Parsing Failed completely.")
+            return None
 
 
 def is_short(duration_iso):
@@ -49,7 +88,7 @@ def is_short(duration_iso):
     except:
         return False
 
-# --- 1. SAVE ROADMAP ---
+# --- ROUTES ---
 
 
 @app.route('/api/save_roadmap', methods=['POST'])
@@ -65,13 +104,11 @@ def save_roadmap():
                 "topic": topic,
                 "graph_data": data.get('graph_data')
             }).execute()
-            return jsonify({"message": "Roadmap Saved Successfully!"})
+            return jsonify({"message": "Roadmap Saved!"})
         else:
-            return jsonify({"message": "Roadmap already exists in profile."})
+            return jsonify({"message": "Roadmap already exists."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# --- 2. SAVE RESOURCE ---
 
 
 @app.route('/api/save_resource', methods=['POST'])
@@ -91,22 +128,17 @@ def save_resource():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- 3. SUBMIT PROGRESS (FIXED) ---
-
 
 @app.route('/api/submit_progress', methods=['POST'])
 def submit_progress():
     data = request.json
     feedback = data.get('feedback', '')
     blob = TextBlob(feedback)
-
     try:
-        # Check if topic is provided, default to "General" if not
         topic = data.get('topic', 'General').strip().title()
-
         supabase.table('node_progress').insert({
             "user_id": data.get('user_id'),
-            "topic": topic,  # This matches the new column we added
+            "topic": topic,
             "node_label": data.get('node_label'),
             "quiz_score": data.get('score'),
             "feedback_text": feedback,
@@ -114,63 +146,99 @@ def submit_progress():
         }).execute()
         return jsonify({"message": "Score Saved"})
     except Exception as e:
-        print(f"Score Save Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- 4. GENERATION APIs ---
-
-
-def generate_ai_roadmap(topic):
-    prompt = f"""Create a linear 7-step learning path for '{topic}'. STRICT JSON ONLY. Format: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}"""
-    try:
-        # FIX: Pass safety_settings
-        response = model.generate_content(
-            prompt, safety_settings=safety_settings)
-        text = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(text)
-    except:
-        return {"nodes": [{"id": "1", "label": f"{topic} Basics"}]}
+# --- AI GENERATORS (Groq) ---
 
 
 @app.route('/api/roadmap', methods=['GET'])
 def get_roadmap():
-    raw_topic = request.args.get('topic', '')
-    topic = raw_topic.strip().title()
+    topic = request.args.get('topic', '').strip().title()
+
+    # 1. Check DB First
     try:
         existing = supabase.table('user_roadmaps').select(
             'graph_data').eq('topic', topic).limit(1).execute()
-        if existing.data and len(existing.data) > 0:
+        if existing.data:
+            print("📂 Loaded from DB")
             return jsonify(existing.data[0]['graph_data'])
     except:
         pass
-    return jsonify(generate_ai_roadmap(topic))
+
+    # 2. Generate New
+    print(f"🚀 Generating Roadmap: {topic}...")
+    prompt = f"""
+    Create a linear 7-step learning path for '{topic}'.
+    Return strict JSON (no extra text) in this format:
+    {{ "nodes": [ {{"id": "1", "label": "Basics"}}, {{"id": "2", "label": "..."}} ] }}
+    """
+    try:
+        completion = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        data = parse_json_safely(completion.choices[0].message.content, "dict")
+        return jsonify(data if data else {"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
+    except Exception as e:
+        print(f"❌ Groq Error: {e}")
+        return jsonify({"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
 
 
 @app.route('/api/quiz', methods=['GET'])
 def get_quiz():
     main = request.args.get('main_topic')
     sub = request.args.get('sub_topic')
-    print(f"Generating Quiz for: {sub}")
+    print(f"🧠 Generating Quiz: {sub}...")
 
     prompt = f"""
-    Create a 5-question multiple-choice quiz about '{sub}' (Context: {main}).
-    STRICT RULES:
-    1. Return VALID JSON array.
-    2. Difficulty Mix: Easy, Medium, Hard.
-    
-    JSON Format: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]
+    Create 5 multiple-choice questions for '{sub}' (Context: {main}).
+    Return a strict JSON Array (no extra text) like this:
+    [
+      {{
+        "question": "Question?",
+        "options": ["A", "B", "C", "D"],
+        "correct_answer": 0
+      }}
+    ]
     """
     try:
-        # FIX: Pass safety_settings here too!
-        response = model.generate_content(
-            prompt, safety_settings=safety_settings)
-        text = response.text.replace("```json", "").replace("```", "").strip()
-        if text.endswith(','):
-            text = text[:-1]
-        return jsonify(json.loads(text))
+        completion = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+
+        # Groq might wrap the array in an object like {"data": [...]}. Let's handle it.
+        raw_text = completion.choices[0].message.content
+        data = parse_json_safely(raw_text, "list")
+
+        # If data came back as a Dictionary (e.g. {"questions": [...]}), extract the list
+        if isinstance(data, dict):
+            for key in data:
+                if isinstance(data[key], list):
+                    return jsonify(data[key])
+            return jsonify([])  # No list found
+
+        return jsonify(data if data else [])
+
     except Exception as e:
-        print(f"Quiz Error: {e}")
-        return jsonify([])
+        print(f"❌ Groq Quiz Error: {e}")
+        # Valid Fallback Quiz (Prevents Option A/B)
+        return jsonify([
+            {"question": f"What is the main concept of {sub}?", "options": [
+                "Concept A", "Concept B", "Concept C", "Concept D"], "correct_answer": 0},
+            {"question": "True or False: This is essential.",
+                "options": ["True", "False"], "correct_answer": 0},
+            {"question": "Which fits best?", "options": [
+                "Option 1", "Option 2", "Option 3", "Option 4"], "correct_answer": 0},
+            {"question": "Why use this?", "options": [
+                "Efficiency", "Cost", "Speed", "All of above"], "correct_answer": 3},
+            {"question": "Advanced Check", "options": [
+                "A", "B", "C", "D"], "correct_answer": 0}
+        ])
 
 
 @app.route('/api/resources', methods=['GET'])
