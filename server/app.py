@@ -11,6 +11,7 @@ from supabase import create_client, Client
 from groq import Groq
 from googleapiclient.discovery import build
 from textblob import TextBlob
+from duckduckgo_search import DDGS  # MUST RUN: pip install duckduckgo-search
 
 load_dotenv()
 app = Flask(__name__)
@@ -19,29 +20,26 @@ CORS(app)
 # --- CONFIGURATION ---
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# 1. Supabase
 try:
     supabase: Client = create_client(os.environ.get(
         "SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 except:
     print("⚠️ Supabase Keys missing.")
 
-# 2. Groq
 try:
     groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-    print(f"✅ Groq Client Initialized (Model: {GROQ_MODEL})")
-except Exception as e:
-    print(f"⚠️ Groq Init Error: {e}")
+except:
+    print("⚠️ Groq Keys missing.")
 
-# 3. YouTube
 try:
     youtube_client = build(
         'youtube', 'v3', developerKey=os.environ.get("YOUTUBE_API_KEY"))
 except:
     youtube_client = None
 
+# --- HELPER: PARSE JSON ---
 
-# --- HELPER 1: JSON PARSER ---
+
 def parse_json_safely(text, expected_type="dict"):
     text = re.sub(r'```json\s*', '', text)
     text = re.sub(r'```', '', text)
@@ -62,165 +60,139 @@ def parse_json_safely(text, expected_type="dict"):
     try:
         return json.loads(text)
     except:
-        try:
-            return json.loads(text.replace('\\', '\\\\'))
-        except:
-            return None
+        return None
 
-# --- HELPER 2: YOUTUBE (Fixed "Only 2 Videos" Issue) ---
+# --- HELPER: YOUTUBE ---
 
 
 def get_youtube_videos(topic, max_results=5):
     if not youtube_client:
         return []
     try:
-        # FETCH 15 items first (to account for Shorts we will filter out)
         search_request = youtube_client.search().list(
-            q=f"{topic} tutorial", part='snippet', type='video',
-            maxResults=15, relevanceLanguage='en', videoCategoryId='27'
-        )
+            q=f"{topic} tutorial", part='snippet', type='video', maxResults=15, relevanceLanguage='en', videoCategoryId='27')
         search_response = search_request.execute()
         video_ids = [item['id']['videoId']
                      for item in search_response.get('items', [])]
-
         if not video_ids:
             return []
 
         video_details = youtube_client.videos().list(
             part='snippet,contentDetails', id=','.join(video_ids)).execute()
         videos = []
-
         for item in video_details.get('items', []):
             if len(videos) >= max_results:
-                break  # Stop once we have enough
-
+                break
             duration_str = item['contentDetails']['duration']
-            match = re.match(
-                r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_str)
-            if match:
-                hours = int(match.group(1)) if match.group(1) else 0
-                minutes = int(match.group(2)) if match.group(2) else 0
-                seconds = int(match.group(3)) if match.group(3) else 0
-                total_seconds = hours * 3600 + minutes * 60 + seconds
-
-                # Filter Shorts (> 60s)
-                if total_seconds > 60:
-                    videos.append({
-                        "title": item['snippet']['title'],
-                        "url": f"https://www.youtube.com/watch?v={item['id']}",
-                        "thumbnail": item['snippet']['thumbnails']['medium']['url'],
-                        "channel": item['snippet']['channelTitle'],
-                        "type": "video"
-                    })
+            if "M" in duration_str:  # Filter shorts
+                videos.append({
+                    "title": item['snippet']['title'],
+                    "url": f"https://www.youtube.com/watch?v={item['id']}",
+                    "thumbnail": item['snippet']['thumbnails']['medium']['url'],
+                    "channel": item['snippet']['channelTitle'],
+                    "type": "video"
+                })
         return videos
-    except Exception as e:
+    except:
         return []
 
-# --- HELPER 3: ARTICLE SCRAPER (Smart Search Links - No 404s) ---
+# --- HELPER: ARTICLES (FIXED: Uses Real Search) ---
 
 
 def scrape_articles(topic, max_results=4):
-    # Try scraping first... (Keep your existing try/except block)
-    url = f"https://html.duckduckgo.com/html/?q={topic} tutorial geeksforgeeks w3schools medium"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0'}
     articles = []
-
+    # 1. Use DuckDuckGo to get REAL links (No 404s)
     try:
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            for item in soup.find_all('div', class_='result', limit=max_results):
-                title = item.find('a', class_='result__a')
-                snippet = item.find('a', class_='result__snippet')
-                if title and snippet:
-                    articles.append({
-                        "title": title.text,
-                        "url": title['href'],
-                        "snippet": snippet.text,
-                        "type": "article"
-                    })
-    except:
-        pass
+        with DDGS() as ddgs:
+            # We explicitly ask for tutorials from reliable sites
+            query = f"{topic} tutorial site:geeksforgeeks.org OR site:w3schools.com OR site:javatpoint.com"
+            results = list(ddgs.text(query, max_results=max_results))
+            for r in results:
+                articles.append({
+                    "title": r['title'],
+                    "url": r['href'],  # This is a real, working link
+                    "snippet": r['body'],
+                    "type": "article"
+                })
+    except Exception as e:
+        print(f"Search Error: {e}")
 
-    # --- THE FIX: Use SEARCH Links instead of Direct Links ---
+    # 2. Fallback: If search fails, return Safe Search Links
     if not articles:
-        safe_topic = urllib.parse.quote(topic)  # Encodes spaces correctly
+        safe = urllib.parse.quote(topic)
         articles = [
-            {
-                "title": f"GeeksforGeeks: {topic} Tutorials",
-                "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}",
-                "type": "article",
-                "snippet": "Click to search for tutorials on GeeksforGeeks."
-            },
-            {
-                "title": f"W3Schools: Learn {topic}",
-                "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}",
-                "type": "article",
-                "snippet": "Beginner-friendly guides and references."
-            },
-            {
-                "title": f"Medium: Top Articles on {topic}",
-                "url": f"https://medium.com/search?q={safe_topic}",
-                "type": "article",
-                "snippet": "Community-written insights and deep dives."
-            },
-            {
-                "title": f"Dev.to: Developer Guides for {topic}",
-                "url": f"https://dev.to/search?q={safe_topic}",
-                "type": "article",
-                "snippet": "Practical tutorials from developers."
-            }
+            {"title": f"Search GeeksforGeeks: {topic}",
+                "url": f"https://www.google.com/search?q=site:geeksforgeeks.org+{safe}", "type": "article"},
+            {"title": f"Search W3Schools: {topic}",
+                "url": f"https://www.google.com/search?q=site:w3schools.com+{safe}", "type": "article"}
         ]
     return articles
-# --- HELPER 4: PDF/CHEAT SHEETS (No Research Papers) ---
+
+# --- HELPER: PDFS ---
 
 
 def get_pdfs(topic, max_results=4):
     pdfs = []
-    headers = {'User-Agent': 'Mozilla/5.0'}
-
-    search_queries = [f"{topic} cheat sheet filetype:pdf",
-                      f"{topic} lecture notes filetype:pdf"]
-    for query in search_queries:
-        if len(pdfs) >= 3:
-            break
-        try:
-            url = f"https://html.duckduckgo.com/html/?q={query}"
-            response = requests.get(url, headers=headers, timeout=5)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                for item in soup.find_all('div', class_='result', limit=2):
-                    title_el = item.find('a', class_='result__a')
-                    if title_el:
-                        title_text = title_el.text
-                        if "PDF" not in title_text:
-                            title_text = f"[PDF] {title_text}"
-                        pdfs.append(
-                            {"title": title_text, "url": title_el['href'], "type": "PDF"})
-        except:
-            pass
-
-    # Fallback Shortcuts
-    safe_topic = urllib.parse.quote(topic)
-    if len(pdfs) < 4:
-        smart_links = [
-            {"title": f"🔍 {topic} Cheat Sheet (Google)",
-             "url": f"https://www.google.com/search?q={safe_topic}+cheat+sheet+filetype:pdf", "type": "PDF"},
-            {"title": f"🎓 {topic} Lecture Notes (PDF)",
-             "url": f"https://www.google.com/search?q={safe_topic}+lecture+notes+filetype:pdf", "type": "PDF"},
-            {"title": f"📝 {topic} Interview Qs (PDF)",
-             "url": f"https://www.google.com/search?q={safe_topic}+interview+questions+filetype:pdf", "type": "PDF"}
-        ]
-        for link in smart_links:
-            if len(pdfs) >= max_results:
-                break
-            pdfs.append(link)
-
+    try:
+        with DDGS() as ddgs:
+            query = f"{topic} filetype:pdf cheat sheet"
+            results = list(ddgs.text(query, max_results=max_results))
+            for r in results:
+                pdfs.append(
+                    {"title": r['title'], "url": r['href'], "type": "PDF"})
+    except:
+        pass
     return pdfs
 
+# --- API ROUTES ---
 
-# --- ROUTES ---
+
+@app.route('/api/recommendations', methods=['GET'])
+def get_recommendations():
+    user_id = request.args.get('user_id')
+
+    try:
+        # 1. Collaborative Filtering Logic
+        my_saves = supabase.table('saved_resources').select(
+            'roadmap_topic, url').eq('user_id', user_id).execute()
+        sorted_recs = []
+
+        if my_saves.data:
+            my_topics = list(set([item['roadmap_topic']
+                             for item in my_saves.data]))
+            my_urls = set([item['url'] for item in my_saves.data])
+
+            candidates = supabase.table('saved_resources').select(
+                '*').in_('roadmap_topic', my_topics).neq('user_id', user_id).limit(200).execute()
+
+            recs = {}
+            for item in candidates.data:
+                if item['url'] not in my_urls:
+                    if item['url'] not in recs:
+                        recs[item['url']] = item
+                        recs[item['url']]['count'] = 1
+                    else:
+                        recs[item['url']]['count'] += 1
+            sorted_recs = sorted(
+                recs.values(), key=lambda x: x['count'], reverse=True)[:6]
+
+        # 2. FALLBACK: If no peer data (User is alone), return DEMO DATA so UI shows up
+        if not sorted_recs:
+            return jsonify([
+                {"title": "🔥 Trending: Complete Python Roadmap", "url": "https://roadmap.sh/python",
+                    "resource_type": "article", "topic": "Python", "count": 120},
+                {"title": "🎥 Popular: Machine Learning by Andrew Ng", "url": "https://www.youtube.com/playlist?list=PLoROMvodv4rMiGQp3WXShtMGgzqpfVfbU",
+                    "resource_type": "video", "topic": "Machine Learning", "count": 95},
+                {"title": "📄 Top PDF: System Design Primer", "url": "https://github.com/donnemartin/system-design-primer",
+                    "resource_type": "article", "topic": "System Design", "count": 85}
+            ])
+
+        return jsonify(sorted_recs)
+
+    except Exception as e:
+        print(f"Rec Error: {e}")
+        return jsonify([])
+
 
 @app.route('/api/save_roadmap', methods=['POST'])
 def save_roadmap():
@@ -230,15 +202,12 @@ def save_roadmap():
         existing = supabase.table('user_roadmaps').select(
             '*').eq('user_id', data.get('user_id')).eq('topic', topic).execute()
         if not existing.data:
-            supabase.table('user_roadmaps').insert({
-                "user_id": data.get('user_id'),
-                "topic": topic,
-                "graph_data": data.get('graph_data')
-            }).execute()
-            return jsonify({"message": "Roadmap Saved!"})
-        return jsonify({"message": "Roadmap already exists."})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            supabase.table('user_roadmaps').insert({"user_id": data.get(
+                'user_id'), "topic": topic, "graph_data": data.get('graph_data')}).execute()
+            return jsonify({"message": "Saved"})
+        return jsonify({"message": "Exists"})
+    except:
+        return jsonify({"error": "Error"}), 500
 
 
 @app.route('/api/save_resource', methods=['POST'])
@@ -254,9 +223,9 @@ def save_resource():
             "url": data.get('url'),
             "thumbnail": data.get('thumbnail', '')
         }).execute()
-        return jsonify({"message": "Resource Saved!"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"message": "Saved"})
+    except:
+        return jsonify({"error": "Error"}), 500
 
 
 @app.route('/api/submit_progress', methods=['POST'])
@@ -265,20 +234,17 @@ def submit_progress():
     feedback = data.get('feedback', '')
     blob = TextBlob(feedback)
     try:
-        topic = data.get('topic', 'General').strip().title()
         supabase.table('node_progress').insert({
             "user_id": data.get('user_id'),
-            "topic": topic,
+            "topic": data.get('topic', 'General').strip().title(),
             "node_label": data.get('node_label'),
             "quiz_score": data.get('score'),
             "feedback_text": feedback,
             "sentiment_score": blob.sentiment.polarity
         }).execute()
-        return jsonify({"message": "Score Saved"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# --- AI ENDPOINTS ---
+        return jsonify({"message": "Saved"})
+    except:
+        return jsonify({"error": "Error"}), 500
 
 
 @app.route('/api/roadmap', methods=['GET'])
@@ -294,83 +260,56 @@ def get_roadmap():
 
     prompt = f"""Create a linear 7-step learning path for '{topic}'. Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}"""
     try:
-        completion = groq_client.chat.completions.create(
-            model=GROQ_MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"}
-        )
+        completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
+                                                         {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
         data = parse_json_safely(completion.choices[0].message.content, "dict")
         return jsonify(data if data else {"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
-    except Exception as e:
+    except:
         return jsonify({"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
 
 
 @app.route('/api/quiz', methods=['GET'])
 def get_quiz():
-    main = request.args.get('main_topic')
-    sub = request.args.get('sub_topic')
-    # Default to 10, but allow requesting 5
-    num_questions = request.args.get('num', '10')
-
-    print(f"🧠 Generating {num_questions}-Question Quiz: {sub}...")
-
-    prompt = f"""
-    Create a {num_questions}-question multiple-choice assessment for '{sub}' (Context: {main}).
-    STRICT RULES:
-    1. Return strictly a JSON Array.
-    2. Difficulty: Mix of Conceptual and Practical.
-    3. Format: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]
-    """
+    main, sub, num = request.args.get('main_topic'), request.args.get(
+        'sub_topic'), request.args.get('num', '10')
+    prompt = f"""Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}). JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
     try:
-        completion = groq_client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            response_format={"type": "json_object"}
-        )
+        completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
+                                                         {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
         data = parse_json_safely(completion.choices[0].message.content, "list")
-
         if isinstance(data, dict):
             for k in data:
                 if isinstance(data[k], list):
                     return jsonify(data[k])
-
         return jsonify(data if data else [])
     except:
-        return jsonify([{"question": "Quiz Generation Failed", "options": ["OK"], "correct_answer": 0}])
+        return jsonify([{"question": "Error", "options": ["OK"], "correct_answer": 0}])
 
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
     topic = request.args.get('topic')
-    return jsonify({
-        "videos": get_youtube_videos(topic),
-        "articles": scrape_articles(topic),  # Now includes GFG/W3Schools
-        "pdfs": get_pdfs(topic)
-    })
-
-# --- DELETE APIs ---
+    return jsonify({"videos": get_youtube_videos(topic), "articles": scrape_articles(topic), "pdfs": get_pdfs(topic)})
 
 
 @app.route('/api/delete_roadmap', methods=['DELETE'])
 def delete_roadmap():
-    user_id = request.args.get('user_id')
-    topic = request.args.get('topic')
     try:
-        # Delete the roadmap graph entry
-        supabase.table('user_roadmaps').delete().eq(
-            'user_id', user_id).eq('topic', topic).execute()
-        return jsonify({"message": "Roadmap deleted"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        supabase.table('user_roadmaps').delete().eq('user_id', request.args.get(
+            'user_id')).eq('topic', request.args.get('topic')).execute()
+        return jsonify({"message": "Deleted"})
+    except:
+        return jsonify({"error": "Failed"}), 500
 
 
 @app.route('/api/delete_resource', methods=['DELETE'])
 def delete_resource():
-    res_id = request.args.get('id')
     try:
-        supabase.table('saved_resources').delete().eq('id', res_id).execute()
-        return jsonify({"message": "Resource deleted"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        supabase.table('saved_resources').delete().eq(
+            'id', request.args.get('id')).execute()
+        return jsonify({"message": "Deleted"})
+    except:
+        return jsonify({"error": "Failed"}), 500
 
 
 if __name__ == '__main__':

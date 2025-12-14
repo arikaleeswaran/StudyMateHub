@@ -3,8 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-// Added FaExclamationTriangle for the warning icon
-import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo, FaExclamationTriangle } from 'react-icons/fa';
+// Added new icons for the Recommendation Section
+import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo, FaExclamationTriangle, FaUserFriends, FaFire, FaPlus } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 
 function ProfilePage() {
@@ -18,14 +18,49 @@ function ProfilePage() {
   const [activeTab, setActiveTab] = useState('library');
   const [loading, setLoading] = useState(true);
 
+  // --- NEW: RECOMMENDATION STATE ---
+  const [recommendations, setRecommendations] = useState([]);
+
   // --- QUIZ STATE ---
   const [showQuiz, setShowQuiz] = useState(false);
   const [activeQuizData, setActiveQuizData] = useState(null);
 
   useEffect(() => {
-    if (user) fetchData();
+    if (user) {
+        fetchData();
+        fetchRecommendations(); // Fetch Recommendations on load
+    }
   }, [user]);
 
+  // --- 1. FETCH RECOMMENDATIONS (New Feature) ---
+  const fetchRecommendations = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        const res = await axios.get(`${baseUrl}/api/recommendations?user_id=${user.id}`);
+        setRecommendations(res.data);
+      } catch (e) { console.error("Rec Error", e); }
+  };
+
+  const handleSaveRecommendation = async (rec) => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        await axios.post(`${baseUrl}/api/save_resource`, {
+            user_id: user.id,
+            roadmap_topic: rec.topic,
+            node_label: "Community Picks", // Saves to a special folder
+            resource_type: rec.resource_type,
+            title: rec.title,
+            url: rec.url,
+            thumbnail: ''
+        });
+        alert("Saved to your Library!");
+        fetchData(); // Refresh library to show new item
+        // Remove from recommendations list visually
+        setRecommendations(prev => prev.filter(r => r.url !== rec.url));
+      } catch(e) { alert("Error saving"); }
+  };
+
+  // --- 2. FETCH DATA (Existing) ---
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -77,24 +112,20 @@ function ProfilePage() {
     }
   };
 
-  // --- NEW: WEAKNESS DETECTOR LOGIC ---
+  // --- WEAKNESS DETECTOR LOGIC ---
   const getNodeStatus = (topicTitle, nodeLabel) => {
       const normalize = (str) => str ? str.trim().toLowerCase() : "";
       
-      // Filter scores for this specific node
       const attempts = allScores.filter(s => 
           normalize(s.topic) === normalize(topicTitle) && 
           normalize(s.node_label) === normalize(nodeLabel)
       );
 
-      // Check if they ever passed (Score >= 6)
       const hasPassed = attempts.some(s => s.quiz_score >= 6);
-      
-      // Count failures (Score < 6)
       const failCount = attempts.filter(s => s.quiz_score < 6).length;
 
-      // DEFINITION OF WEAK ZONE: Not passed yet AND failed 2+ times
-      const isWeak = !hasPassed && failCount >= 2;
+      // Weak if failed 2+ times
+      const isWeak = failCount >= 2; 
 
       return { isWeak, failCount, hasPassed };
   };
@@ -142,8 +173,6 @@ function ProfilePage() {
 
   const getProgress = (topicKey) => {
       const normalize = (str) => str ? str.trim().toLowerCase() : "";
-      
-      // Find raw map data matching the key
       const mapData = userRoadmaps.find(r => normalize(r.topic) === topicKey);
       
       if (!mapData || !mapData.graph_data || !mapData.graph_data.nodes) return null;
@@ -175,6 +204,38 @@ function ProfilePage() {
         <button onClick={handleLogout} style={{ padding: '8px 15px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Logout</button>
       </div>
 
+      {/* --- NEW: RECOMMENDATIONS UI SECTION --- */}
+      {recommendations.length > 0 && (
+          <div style={{marginBottom:'40px', padding:'25px', background:'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius:'15px', color:'white', boxShadow:'0 4px 15px rgba(0,0,0,0.2)'}}>
+              <h2 style={{margin:'0 0 20px 0', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.4rem'}}>
+                  <FaUserFriends color="#FFD700"/> Students Like You Are Studying:
+              </h2>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'20px'}}>
+                  {recommendations.map((rec, i) => (
+                      <div key={i} style={{background:'rgba(255,255,255,0.95)', padding:'15px', borderRadius:'10px', color:'#333', display:'flex', flexDirection:'column', boxShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>
+                          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px'}}>
+                              <span style={{fontSize:'0.75rem', fontWeight:'bold', textTransform:'uppercase', color:'#764ba2', background:'#f3e5f5', padding:'2px 8px', borderRadius:'4px'}}>{rec.topic}</span>
+                              <div style={{fontSize:'0.8rem', color:'#555', display:'flex', alignItems:'center', gap:'4px'}}><FaFire color="#ff5722"/> {rec.count} students</div>
+                          </div>
+                          
+                          <div style={{fontWeight:'bold', marginBottom:'15px', fontSize:'1rem', flex:1, lineHeight:'1.4', display:'flex', alignItems:'start', gap:'8px'}}>
+                              {rec.resource_type === 'video' ? <FaVideo color="#d32f2f" style={{marginTop:'3px'}}/> : <FaGlobe color="#28a745" style={{marginTop:'3px'}}/>}
+                              {rec.title}
+                          </div>
+                          
+                          <div style={{display:'flex', gap:'10px', marginTop:'auto'}}>
+                              <a href={rec.url} target="_blank" rel="noreferrer" style={{flex:1, padding:'10px', background:'#f0f2f5', textAlign:'center', borderRadius:'6px', textDecoration:'none', color:'#333', fontSize:'0.9rem', fontWeight:'bold', border:'1px solid #ddd'}}>View</a>
+                              <button onClick={() => handleSaveRecommendation(rec)} style={{flex:1, padding:'10px', background:'#28a745', border:'none', borderRadius:'6px', color:'white', cursor:'pointer', display:'flex', justifyContent:'center', alignItems:'center', gap:'6px', fontSize:'0.9rem', fontWeight:'bold', boxShadow:'0 2px 5px rgba(40,167,69,0.3)'}}>
+                                  <FaPlus/> Save
+                              </button>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      )}
+
+      {/* Tabs */}
       <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid #eee'}}>
           <button onClick={() => setActiveTab('library')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'library' ? '3px solid #007bff' : 'none', fontWeight:'bold', color: activeTab === 'library' ? '#007bff' : '#555', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaBook/> My Library</button>
           <button onClick={() => setActiveTab('assessments')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'assessments' ? '3px solid #007bff' : 'none', fontWeight:'bold', color: activeTab === 'assessments' ? '#007bff' : '#555', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaChartBar/> My Assessments</button>
@@ -247,11 +308,10 @@ function ProfilePage() {
                                                         <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? '#e8f5e9' : '#fff3cd', color: s.quiz_score >=6 ? 'green' : '#856404', borderRadius:'15px', fontSize:'0.8rem'}}>
                                                             <FaStar/> Score: {s.quiz_score}/10
                                                         </div>
-                                                        {s.quiz_score < 6 && (
-                                                            <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #ccc', borderRadius:'5px', background:'white', display:'flex', alignItems:'center', gap:'4px'}}>
-                                                                <FaRedo size={10}/> Retake
-                                                            </button>
-                                                        )}
+                                                        {/* ALWAYS SHOW RETAKE IF FAILED OR LOW SCORE */}
+                                                        <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #ccc', borderRadius:'5px', background:'white', display:'flex', alignItems:'center', gap:'4px'}}>
+                                                            <FaRedo size={10}/> Retake
+                                                        </button>
                                                       </div>
                                                   ))}
 
