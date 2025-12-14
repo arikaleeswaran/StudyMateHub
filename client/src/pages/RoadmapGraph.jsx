@@ -5,6 +5,8 @@ import { getRoadmap } from '../services/api';
 import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
+import Navbar from '../components/Navbar'; // ✅ IMPORT NAVBAR
+import Toast from '../components/Toast';   // ✅ IMPORT TOAST
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase'; 
 
@@ -19,10 +21,12 @@ function RoadmapGraph() {
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [progress, setProgress] = useState(0);
 
+  // Modal & Toast States
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizType, setQuizType] = useState('full'); 
   const [checkNode, setCheckNode] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' }); // ✅ TOAST STATE
   
   const [loadingResources, setLoadingResources] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
@@ -47,7 +51,6 @@ function RoadmapGraph() {
                 .eq('topic', topic);
             
             if (data) {
-                // Pass mark: Score >= 6 for Full OR Score >= 3 for Shortcut
                 const passedNodes = data.filter(d => d.quiz_score >= 3).map(d => d.node_label);
                 setCompletedNodes(new Set(passedNodes));
             }
@@ -64,19 +67,24 @@ function RoadmapGraph() {
       }
   }, [nodes, completedNodes]);
 
+  // ✅ HELPER: SHOW TOAST
+  const showNotification = (msg, type='success') => {
+      setToast({ show: true, message: msg, type });
+  };
+
   const handleSaveRoadmap = async () => {
-    if (!user) { alert("Login required"); navigate('/auth'); return; }
+    if (!user) { navigate('/auth'); return; }
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_roadmap`, {
             user_id: user.id, topic: topic, graph_data: { nodes: nodes }
         });
-        alert("Roadmap saved!");
-    } catch (e) { alert("Error saving."); }
+        showNotification("Roadmap saved successfully!"); // ✅ Custom Toast
+    } catch (e) { showNotification("Error saving roadmap", "error"); }
   };
 
   const handleSaveResource = async (item, type) => {
-    if (!user) return alert("Login required");
+    if (!user) return showNotification("Login required to save", "error");
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_resource`, {
@@ -88,13 +96,13 @@ function RoadmapGraph() {
             url: item.url,
             thumbnail: item.thumbnail || ''
         });
-        alert("Saved!");
-    } catch(e) { alert("Error saving."); }
+        showNotification("Resource added to Library! 📚"); // ✅ Custom Toast
+    } catch(e) { showNotification("Error saving resource", "error"); }
   };
 
   const handleNodeClick = (node, index) => {
     if (index > 0 && !completedNodes.has(nodes[index - 1].label)) {
-        alert("🔒 Locked! Please complete the previous module first.");
+        showNotification("🔒 Complete previous module first!", "error");
         return;
     }
     setCheckNode(node); 
@@ -122,33 +130,24 @@ function RoadmapGraph() {
   };
 
   const handleQuizComplete = async (score, feedback) => {
-    setShowQuizModal(false); // Close Modal
-
-    // 1. ALWAYS SAVE SCORE TO DB
+    setShowQuizModal(false);
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
             await axios.post(`${baseUrl}/api/submit_progress`, {
-                user_id: user.id,
-                topic: topic,
-                node_label: checkNode.label,
-                score: score,
-                feedback: feedback
+                user_id: user.id, topic: topic, node_label: checkNode.label, score: score, feedback: feedback
             });
-            console.log("✅ Score Saved to Database");
-        } catch(e) { console.error("❌ Error saving score:", e); }
+        } catch(e) { console.error(e); }
     }
     
-    // 2. Determine Pass/Fail for UI Logic
-    let passed = false;
-    if (quizType === 'diagnostic') passed = score >= 3;
-    else passed = score >= 6; 
+    let passed = quizType === 'diagnostic' ? score >= 3 : score >= 6; 
 
     if (passed) {
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
-        alert("🎉 Module Passed!");
+        showNotification("🎉 Module Passed! Unlocked next step.");
     } else {
         if (quizType === 'diagnostic') fetchResources(checkNode); 
+        else showNotification("Keep studying! Try again later.", "error");
     }
   };
 
@@ -176,8 +175,16 @@ function RoadmapGraph() {
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
       
+      {/* ✅ NAVBAR: Fixed at top */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}>
+         <Navbar />
+      </div>
+
+      {/* ✅ TOAST NOTIFICATION */}
+      {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
+
       {/* Header */}
-      <div style={{ padding: '20px', borderBottom: '1px solid #eee', background: '#fafafa', position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ padding: '20px', borderBottom: '1px solid #eee', background: '#fafafa', position:'sticky', top:'70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
             <h2 style={{ margin: '0 0 10px 0', color: '#333', textTransform: 'capitalize', textAlign:'center' }}>
                 🗺️ Path: <span style={{color: '#007bff'}}>{topic}</span>
@@ -239,6 +246,7 @@ function RoadmapGraph() {
         })}
       </div>
 
+      {/* Resources Section */}
       <div style={{ background: '#f8f9fa', padding: '50px 20px', borderTop: '2px solid #ddd', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
