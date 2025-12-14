@@ -10,7 +10,6 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Navbar /> {/* <--- Place it here, inside Router but outside Routes */}
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} />

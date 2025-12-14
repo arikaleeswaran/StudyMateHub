@@ -1,9 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { FaBrain, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
@@ -11,53 +12,70 @@ function Navbar() {
   };
 
   return (
-    <nav style={navStyle}>
-      {/* Logo / Home Link */}
-      <Link to="/" style={logoStyle}>
-        🧠 StudyMateHub
-      </Link>
-
-      {/* Auth Buttons */}
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+    <nav style={styles.navbar}>
+      <div style={styles.logo} onClick={() => navigate('/')}>
+          <FaBrain style={{ color: '#00d2ff', fontSize: '1.5rem' }} />
+          <span style={styles.logoText}>StudyMateHub</span>
+      </div>
+      
+      <div style={{display:'flex', gap:'15px', alignItems: 'center'}}>
         {user ? (
-          <>
-            <span style={{ color: '#666', fontSize: '0.9rem' }}>
-              Hello, {user.user_metadata.full_name || user.email.split('@')[0]}
-            </span>
-            <Link to="/profile" style={linkStyle}>My Profile</Link>
-            <button onClick={handleLogout} style={logoutBtnStyle}>Logout</button>
-          </>
+            <>
+                <button onClick={() => navigate('/profile')} style={styles.navButton}>
+                    <FaUserCircle size={18} /> Dashboard
+                </button>
+                <button onClick={handleLogout} style={{...styles.navButton, background:'rgba(220, 53, 69, 0.2)', borderColor:'rgba(220, 53, 69, 0.3)', color: '#ff6b6b'}}>
+                    <FaSignOutAlt />
+                </button>
+            </>
         ) : (
-          <Link to="/auth" style={loginBtnStyle}>Login / Sign Up</Link>
+            <button onClick={() => navigate('/auth')} style={styles.navButton}>
+                Login
+            </button>
         )}
       </div>
     </nav>
   );
 }
 
-// Styles
-const navStyle = {
-  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  padding: '15px 40px', background: 'white', borderBottom: '1px solid #eee',
-  position: 'sticky', top: 0, zIndex: 1000, boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-};
-
-const logoStyle = {
-  fontSize: '1.5rem', fontWeight: 'bold', textDecoration: 'none', color: '#333'
-};
-
-const linkStyle = {
-  textDecoration: 'none', color: '#333', fontWeight: '600'
-};
-
-const loginBtnStyle = {
-  padding: '10px 20px', background: '#007bff', color: 'white',
-  borderRadius: '20px', textDecoration: 'none', fontWeight: 'bold', transition: '0.2s'
-};
-
-const logoutBtnStyle = {
-  padding: '8px 15px', background: '#dc3545', color: 'white',
-  border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'
+const styles = {
+  navbar: {
+    width: '100%',
+    padding: '15px 40px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: '#1e293b', // Matches the Homepage Dark Theme
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    color: 'white',
+    boxSizing: 'border-box'
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer'
+  },
+  logoText: {
+    fontWeight: 'bold', 
+    fontSize: '1.2rem', 
+    background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', 
+    WebkitBackgroundClip: 'text', 
+    WebkitTextFillColor: 'transparent'
+  },
+  navButton: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    padding: '8px 15px',
+    borderRadius: '20px',
+    color: 'white',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.3s ease',
+    fontSize: '0.9rem'
+  }
 };
 
 export default Navbar;
