@@ -29,10 +29,8 @@ function RoadmapGraph() {
   
   const mapFetched = useRef(false);
 
-  // --- 1. LOAD DATA ---
   useEffect(() => {
     if (mapFetched.current === topic) return;
-    
     const init = async () => {
         mapFetched.current = topic;
         setMapLoading(true);
@@ -95,7 +93,6 @@ function RoadmapGraph() {
   };
 
   const handleNodeClick = (node, index) => {
-    // LOCK LOGIC
     if (index > 0 && !completedNodes.has(nodes[index - 1].label)) {
         alert("🔒 Locked! Please complete the previous module first.");
         return;
@@ -120,22 +117,14 @@ function RoadmapGraph() {
       setShowQuizModal(true);
   };
 
+  const handleUpgradeToFull = () => {
+      setQuizType('full');
+  };
+
   const handleQuizComplete = async (score, feedback) => {
-    setShowQuizModal(false);
-    
-    let passed = false;
-    if (quizType === 'diagnostic') passed = score >= 3;
-    else passed = score >= 6; 
+    setShowQuizModal(false); // Close Modal
 
-    if (passed) {
-        setCompletedNodes(prev => new Set(prev).add(checkNode.label));
-    } else {
-        if (quizType === 'diagnostic') {
-            fetchResources(checkNode); 
-            return; 
-        }
-    }
-
+    // 1. ALWAYS SAVE SCORE TO DB
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
@@ -146,7 +135,20 @@ function RoadmapGraph() {
                 score: score,
                 feedback: feedback
             });
-        } catch(e) { console.error(e); }
+            console.log("✅ Score Saved to Database");
+        } catch(e) { console.error("❌ Error saving score:", e); }
+    }
+    
+    // 2. Determine Pass/Fail for UI Logic
+    let passed = false;
+    if (quizType === 'diagnostic') passed = score >= 3;
+    else passed = score >= 6; 
+
+    if (passed) {
+        setCompletedNodes(prev => new Set(prev).add(checkNode.label));
+        alert("🎉 Module Passed!");
+    } else {
+        if (quizType === 'diagnostic') fetchResources(checkNode); 
     }
   };
 
@@ -207,10 +209,8 @@ function RoadmapGraph() {
                                 <div 
                                     onClick={() => handleNodeClick(node, globalIndex)} 
                                     style={{
-                                        // UPDATED BUBBLE STYLE
-                                        width: '180px', height: '180px', // Bigger size
+                                        width: '180px', height: '180px',
                                         borderRadius: '50%',
-                                        // No dimming: Locked is White with Grey border
                                         background: isCompleted ? '#d4edda' : isSelected ? '#e3f2fd' : '#ffffff',
                                         border: isLocked ? '3px solid #ccc' : isCompleted ? '3px solid #28a745' : isSelected ? '3px solid #007bff' : '3px solid #333',
                                         color: '#333',
@@ -219,12 +219,11 @@ function RoadmapGraph() {
                                         cursor: isLocked ? 'not-allowed' : 'pointer',
                                         boxShadow: isSelected ? '0 0 15px rgba(0,123,255,0.4)' : '0 4px 6px rgba(0,0,0,0.1)',
                                         transition: 'all 0.3s ease', position: 'relative',
-                                        wordBreak: 'break-word', overflow: 'hidden' // Keeps text inside
+                                        wordBreak: 'break-word', overflow: 'hidden'
                                     }}
                                 >
                                     {isLocked ? <FaLock size={20} color="#999" style={{marginBottom:'8px'}}/> : 
                                      isCompleted ? <FaCheckCircle color="#28a745" size={24} style={{marginBottom:'8px'}} /> : null}
-                                    
                                     <span style={{fontSize:'0.85rem', fontWeight:'bold', lineHeight:'1.3', padding:'0 5px'}}>
                                         {node.label}
                                     </span>
@@ -240,7 +239,6 @@ function RoadmapGraph() {
         })}
       </div>
 
-      {/* Resources Panel */}
       <div style={{ background: '#f8f9fa', padding: '50px 20px', borderTop: '2px solid #ddd', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -286,6 +284,7 @@ function RoadmapGraph() {
             questionCount={quizType === 'diagnostic' ? 5 : 10}
             onClose={() => setShowQuizModal(false)} 
             onComplete={handleQuizComplete} 
+            onRetry={handleUpgradeToFull} 
         />
       )}
     </div>

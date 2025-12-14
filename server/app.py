@@ -116,10 +116,11 @@ def get_youtube_videos(topic, max_results=5):
     except Exception as e:
         return []
 
-# --- HELPER 3: ARTICLE SCRAPER (GFG, W3Schools, Medium) ---
+# --- HELPER 3: ARTICLE SCRAPER (Smart Search Links - No 404s) ---
 
 
 def scrape_articles(topic, max_results=4):
+    # Try scraping first... (Keep your existing try/except block)
     url = f"https://html.duckduckgo.com/html/?q={topic} tutorial geeksforgeeks w3schools medium"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0'}
@@ -142,21 +143,36 @@ def scrape_articles(topic, max_results=4):
     except:
         pass
 
-    # STRONG FALLBACK (If scraping fails, return these guaranteed links)
+    # --- THE FIX: Use SEARCH Links instead of Direct Links ---
     if not articles:
-        safe_topic = topic.replace(' ', '-').lower()
+        safe_topic = urllib.parse.quote(topic)  # Encodes spaces correctly
         articles = [
-            {"title": f"GeeksforGeeks: {topic} Guide",
-                "url": f"https://www.geeksforgeeks.org/{safe_topic}/", "type": "article"},
-            {"title": f"W3Schools: Learn {topic}",
-                "url": f"https://www.w3schools.com/{safe_topic}/", "type": "article"},
-            {"title": f"Medium: {topic} Concepts",
-                "url": f"https://medium.com/tag/{safe_topic}", "type": "article"},
-            {"title": f"Dev.to: {topic} Tutorials",
-                "url": f"https://dev.to/t/{safe_topic}", "type": "article"}
+            {
+                "title": f"GeeksforGeeks: {topic} Tutorials",
+                "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}",
+                "type": "article",
+                "snippet": "Click to search for tutorials on GeeksforGeeks."
+            },
+            {
+                "title": f"W3Schools: Learn {topic}",
+                "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}",
+                "type": "article",
+                "snippet": "Beginner-friendly guides and references."
+            },
+            {
+                "title": f"Medium: Top Articles on {topic}",
+                "url": f"https://medium.com/search?q={safe_topic}",
+                "type": "article",
+                "snippet": "Community-written insights and deep dives."
+            },
+            {
+                "title": f"Dev.to: Developer Guides for {topic}",
+                "url": f"https://dev.to/search?q={safe_topic}",
+                "type": "article",
+                "snippet": "Practical tutorials from developers."
+            }
         ]
     return articles
-
 # --- HELPER 4: PDF/CHEAT SHEETS (No Research Papers) ---
 
 

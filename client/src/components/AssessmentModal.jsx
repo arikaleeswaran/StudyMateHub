@@ -4,7 +4,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';     
 import 'katex/dist/katex.min.css';          
 
-function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onComplete }) {
+function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onComplete, onRetry }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentQ, setCurrentQ] = useState(0);
@@ -19,7 +19,6 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
       setQuizFinished(false);
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        // Send ?num=5 or ?num=10
         const res = await fetch(`${baseUrl}/api/quiz?main_topic=${mainTopic}&sub_topic=${subTopic}&num=${questionCount}`);
         const data = await res.json();
         
@@ -50,12 +49,22 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
     }
   };
 
-  // PASS MARK Logic: 60%
+  // PASS MARK: 60% (3/5 or 6/10)
   const PASS_MARK = Math.ceil(questions.length * 0.6);
   const hasPassed = score >= PASS_MARK;
 
   const handleSubmit = () => {
     onComplete(score, feedbackText);
+  };
+
+  // RETRY SAME QUIZ (Reloads Questions)
+  const handleRetakeSelf = () => {
+      loadQuiz();
+  };
+
+  // SWITCH TO FULL EXAM (Only for 5Q)
+  const handleSwitchToFull = () => {
+      if (onRetry) onRetry(); 
   };
 
   if (loading) {
@@ -74,6 +83,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
       <div className="modal-card" style={{ maxWidth: '750px', padding: '0', overflow: 'hidden', textAlign:'left' }}>
         
         {!quizFinished ? (
+          /* --- QUESTION UI --- */
           <>
             <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Assessment"}: {subTopic}</h3>
@@ -104,7 +114,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
             </div>
           </>
         ) : (
-          /* --- RESULT SCREEN --- */
+          /* --- RESULT UI --- */
           <div style={{ padding: '50px', textAlign:'center' }}>
             
             <div style={{ fontSize: '5rem', marginBottom: '20px' }}>
@@ -119,35 +129,39 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
                 You scored <strong>{score} / {questions.length}</strong>.
                 <br/>
                 {hasPassed 
-                    ? "Great job! You have verified your knowledge." 
-                    : questionCount === 5 
-                        ? "Shortcut Failed. You must view the resources and take the Full Assessment."
-                        : "You need 60% to pass. Please review and retake."
+                    ? "Great job! Knowledge verified." 
+                    : "You need 60% to pass."
                 }
             </p>
 
             {hasPassed ? (
-                // PASS UI
+                // PASS SCREEN
                 <div>
                      <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>Optional Feedback:</label>
                      <textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} style={{ width: '100%', height: '60px', padding: '10px', marginBottom:'20px', borderRadius:'5px', border:'1px solid #ccc' }} placeholder="What did you learn?"/>
-                     
-                     <div style={{ display: 'flex', gap: '15px' }}>
-                        <button onClick={onClose} style={{ flex: 1, padding: '12px', background: '#e9ecef', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>Close</button>
-                        <button onClick={handleSubmit} style={{ flex: 1, padding: '12px', background: '#28a745', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>Complete Module ✅</button>
-                     </div>
+                     <button onClick={handleSubmit} style={{ width: '100%', padding: '15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', fontSize:'1.1rem' }}>Complete Module ✅</button>
                 </div>
             ) : (
-                // FAIL UI
-                <div style={{ display: 'flex', gap: '15px', justifyContent:'center' }}>
-                    <button onClick={onClose} style={{ padding: '12px 30px', background: '#e9ecef', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>
-                        {questionCount === 5 ? "Go to Resources 📚" : "Close"}
-                    </button>
+                // FAIL SCREEN
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems:'center' }}>
                     
-                    {/* SHOW RETAKE ONLY FOR FULL (10Q) ASSESSMENT */}
-                    {questionCount !== 5 && (
-                        <button onClick={loadQuiz} style={{ padding: '12px 30px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>🔄 Retake Assessment</button>
-                    )}
+                    <div style={{display:'flex', gap:'10px', width:'100%'}}>
+                        {/* 1. RETAKE SAME TEST (Always Available) */}
+                        <button onClick={handleRetakeSelf} style={{ flex:1, padding: '12px', background: '#e9ecef', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>
+                            🔄 Retake {questionCount === 5 ? "Shortcut" : "Exam"}
+                        </button>
+                        
+                        {/* 2. TAKE FULL EXAM (Only if failed 5Q) */}
+                        {questionCount === 5 && (
+                            <button onClick={handleSwitchToFull} style={{ flex:1, padding: '12px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>
+                                🎓 Take Full Exam
+                            </button>
+                        )}
+                    </div>
+
+                    <button onClick={handleSubmit} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
+                        Close & Save Progress
+                    </button>
                 </div>
             )}
 
