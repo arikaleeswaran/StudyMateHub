@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo } from 'react-icons/fa';
+// Added FaExclamationTriangle for the warning icon
+import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo, FaExclamationTriangle } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 
 function ProfilePage() {
@@ -37,28 +38,30 @@ function ProfilePage() {
 
         const grouped = {};
         
-        // 1. Folders (Roadmaps) - Use Topic as Unique Key
+        // 1. Folders (Roadmaps) - Normalize Logic
+        const normalize = (str) => str ? str.trim().toLowerCase() : "unknown";
+
         roadmaps.data?.forEach(r => {
-            const key = r.topic; // Normalize logic if needed (e.g. lowercase)
-            if (!grouped[key]) grouped[key] = { hasRoadmap: true, subfolders: {} };
+            const key = normalize(r.topic); 
+            if (!grouped[key]) grouped[key] = { displayTitle: r.topic, hasRoadmap: true, subfolders: {} };
             else grouped[key].hasRoadmap = true;
         });
 
-        // 2. Resources (Attach to existing folders or create new placeholder)
+        // 2. Resources
         resources.data?.forEach(r => {
-            const key = r.roadmap_topic;
-            if (!grouped[key]) grouped[key] = { hasRoadmap: false, subfolders: {} };
+            const key = normalize(r.roadmap_topic);
+            if (!grouped[key]) grouped[key] = { displayTitle: r.roadmap_topic, hasRoadmap: false, subfolders: {} };
             if (!grouped[key].subfolders[r.node_label]) {
                 grouped[key].subfolders[r.node_label] = { resources: [], scores: [] };
             }
             grouped[key].subfolders[r.node_label].resources.push(r);
         });
 
-        // 3. Scores (Attach to folders)
+        // 3. Scores
         scores.data?.forEach(s => {
-            const key = s.topic; 
+            const key = normalize(s.topic); 
             if (key) {
-                if (!grouped[key]) grouped[key] = { hasRoadmap: false, subfolders: {} };
+                if (!grouped[key]) grouped[key] = { displayTitle: s.topic, hasRoadmap: false, subfolders: {} };
                 if (!grouped[key].subfolders[s.node_label]) {
                     grouped[key].subfolders[s.node_label] = { resources: [], scores: [] };
                 }
@@ -72,6 +75,28 @@ function ProfilePage() {
     } finally {
         setLoading(false);
     }
+  };
+
+  // --- NEW: WEAKNESS DETECTOR LOGIC ---
+  const getNodeStatus = (topicTitle, nodeLabel) => {
+      const normalize = (str) => str ? str.trim().toLowerCase() : "";
+      
+      // Filter scores for this specific node
+      const attempts = allScores.filter(s => 
+          normalize(s.topic) === normalize(topicTitle) && 
+          normalize(s.node_label) === normalize(nodeLabel)
+      );
+
+      // Check if they ever passed (Score >= 6)
+      const hasPassed = attempts.some(s => s.quiz_score >= 6);
+      
+      // Count failures (Score < 6)
+      const failCount = attempts.filter(s => s.quiz_score < 6).length;
+
+      // DEFINITION OF WEAK ZONE: Not passed yet AND failed 2+ times
+      const isWeak = !hasPassed && failCount >= 2;
+
+      return { isWeak, failCount, hasPassed };
   };
 
   const handleRetake = (mainTopic, subTopic) => {
@@ -91,7 +116,7 @@ function ProfilePage() {
             feedback: feedback
         });
         alert(`Score Saved: ${score}/10`);
-        fetchData(); // Refresh to update score in UI
+        fetchData(); 
       } catch(e) { console.error(e); }
   };
 
@@ -113,18 +138,22 @@ function ProfilePage() {
     } catch(e) { alert("Error deleting resource"); }
   };
 
-  // Helper to get unique roadmap list to prevent duplicates
   const uniqueTopics = Object.keys(folders);
 
-  const getProgress = (topic) => {
-      const mapData = userRoadmaps.find(r => r.topic === topic);
-      // If no roadmap data (e.g. only resources saved), we can't calc %
+  const getProgress = (topicKey) => {
+      const normalize = (str) => str ? str.trim().toLowerCase() : "";
+      
+      // Find raw map data matching the key
+      const mapData = userRoadmaps.find(r => normalize(r.topic) === topicKey);
+      
       if (!mapData || !mapData.graph_data || !mapData.graph_data.nodes) return null;
 
       const nodes = mapData.graph_data.nodes; 
       const total = nodes.length;
-      // Count unique passed nodes (Score >= 6)
-      const completedNodeLabels = new Set(allScores.filter(s => s.topic === topic && s.quiz_score >= 6).map(s => s.node_label));
+      
+      const completedNodeLabels = new Set(
+          allScores.filter(s => normalize(s.topic) === topicKey && s.quiz_score >= 6).map(s => s.node_label)
+      );
       const completedCount = completedNodeLabels.size;
       const percentage = Math.round((completedCount / total) * 100);
       const currentNode = nodes.find(n => !completedNodeLabels.has(n.label));
@@ -155,16 +184,17 @@ function ProfilePage() {
           activeTab === 'library' ? (
               uniqueTopics.length === 0 ? <div style={{textAlign:'center', padding:'50px', background:'#f9f9f9'}}><h3>No Saved Content 📂</h3></div> :
               <div>
-                  {uniqueTopics.map(topic => {
-                      const progress = getProgress(topic); 
+                  {uniqueTopics.map(key => {
+                      const folder = folders[key];
+                      const progress = getProgress(key); 
                       return (
-                          <div key={topic} style={{ marginBottom: '20px', border: '1px solid #eee', borderRadius: '10px', overflow:'hidden' }}>
+                          <div key={key} style={{ marginBottom: '20px', border: '1px solid #eee', borderRadius: '10px', overflow:'hidden' }}>
                               <div style={{ padding: '20px', background: '#f8f9fa', display: 'flex', alignItems: 'center', gap: '15px' }}>
                                   
-                                  <div onClick={() => toggleFolder(topic)} style={{display:'flex', flexDirection:'column', gap:'5px', flex:1, cursor:'pointer'}}>
+                                  <div onClick={() => toggleFolder(key)} style={{display:'flex', flexDirection:'column', gap:'5px', flex:1, cursor:'pointer'}}>
                                     <div style={{display:'flex', alignItems:'center', gap:'10px', fontWeight:'bold', fontSize:'1.1rem'}}>
-                                        {expandedFolders[topic] ? <FaFolderOpen color="#ffc107" size={24}/> : <FaFolder color="#ffc107" size={24}/>}
-                                        <span style={{textTransform:'capitalize'}}>{topic}</span>
+                                        {expandedFolders[key] ? <FaFolderOpen color="#ffc107" size={24}/> : <FaFolder color="#ffc107" size={24}/>}
+                                        <span style={{textTransform:'capitalize'}}>{folder.displayTitle}</span>
                                     </div>
                                     {progress && (
                                         <div style={{width:'100%', maxWidth:'400px', marginTop:'5px'}}>
@@ -179,58 +209,68 @@ function ProfilePage() {
                                     )}
                                   </div>
 
-                                  <span style={{color:'#999', marginRight:'10px'}}>{expandedFolders[topic] ? <FaChevronDown/> : <FaChevronRight/>}</span>
-                                  {folders[topic].hasRoadmap && (
-                                    <button onClick={() => handleDeleteRoadmap(topic)} style={{background:'none', border:'none', cursor:'pointer', color:'#dc3545', padding:'10px'}}>
+                                  <span style={{color:'#999', marginRight:'10px'}}>{expandedFolders[key] ? <FaChevronDown/> : <FaChevronRight/>}</span>
+                                  {folder.hasRoadmap && (
+                                    <button onClick={() => handleDeleteRoadmap(folder.displayTitle)} style={{background:'none', border:'none', cursor:'pointer', color:'#dc3545', padding:'10px'}}>
                                         <FaTrash size={18} />
                                     </button>
                                   )}
                               </div>
 
-                              {expandedFolders[topic] && (
+                              {expandedFolders[key] && (
                                   <div style={{ padding: '20px', background: 'white' }}>
-                                      {folders[topic].hasRoadmap && (
-                                          <button onClick={() => navigate(`/roadmap/${topic}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
+                                      {folder.hasRoadmap && (
+                                          <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
                                       )}
 
-                                      {Object.keys(folders[topic].subfolders).map(subNode => (
-                                          <div key={subNode} style={{ marginLeft: '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: '3px solid #eee' }}>
-                                              <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>
-                                                {folders[topic].subfolders[subNode].scores.some(s => s.quiz_score >= 6) ? <FaCheckCircle color="green" style={{marginRight:'8px'}}/> : <span style={{marginRight:'24px'}}></span>}
-                                                {subNode}
-                                              </h4>
-                                              
-                                              {/* SCORES + RETAKE (For Library View) */}
-                                              {folders[topic].subfolders[subNode].scores.map((s, i) => (
-                                                  <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
-                                                    <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? '#e8f5e9' : '#fff3cd', color: s.quiz_score >=6 ? 'green' : '#856404', borderRadius:'15px', fontSize:'0.8rem'}}>
-                                                        <FaStar/> Score: {s.quiz_score}/10
-                                                    </div>
-                                                    {/* SHOW RETAKE IF FAILED OR LOW SCORE */}
-                                                    {s.quiz_score < 6 && (
-                                                        <button onClick={() => handleRetake(topic, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #ccc', borderRadius:'5px', background:'white', display:'flex', alignItems:'center', gap:'4px'}}>
-                                                            <FaRedo size={10}/> Retake
-                                                        </button>
-                                                    )}
-                                                  </div>
-                                              ))}
+                                      {Object.keys(folder.subfolders).map(subNode => {
+                                          // CHECK STATUS FOR WEAKNESS
+                                          const status = getNodeStatus(folder.displayTitle, subNode);
 
-                                              {/* RESOURCES */}
-                                              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
-                                                  {folders[topic].subfolders[subNode].resources.map(res => (
-                                                      <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'white', border:'1px solid #eee', borderRadius:'8px'}}>
-                                                          <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'#333', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
-                                                              {res.resource_type === 'video' ? <FaVideo color="#d32f2f"/> : res.resource_type === 'article' ? <FaGlobe color="#28a745"/> : <FaFilePdf color="#ffc107"/>}
-                                                              <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
-                                                          </a>
-                                                          <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#ccc', padding:'0 5px'}}>
-                                                              <FaTrash size={12}/>
-                                                          </button>
+                                          return (
+                                              <div key={subNode} style={{ marginLeft: '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #dc3545' : '3px solid #eee' }}>
+                                                  <h4 style={{ margin: '0 0 10px 0', color: '#333', display:'flex', alignItems:'center', gap:'10px' }}>
+                                                    {status.hasPassed ? <FaCheckCircle color="green"/> : <span style={{width:'16px'}}></span>}
+                                                    {subNode}
+                                                    
+                                                    {/* WEAK ZONE BADGE */}
+                                                    {status.isWeak && (
+                                                        <span style={{fontSize:'0.75rem', background:'#ffebee', color:'#c62828', padding:'4px 8px', borderRadius:'12px', border:'1px solid #ffcdd2', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                            <FaExclamationTriangle/> Weak Zone ({status.failCount} fails)
+                                                        </span>
+                                                    )}
+                                                  </h4>
+                                                  
+                                                  {/* SCORES + RETAKE */}
+                                                  {folder.subfolders[subNode].scores.map((s, i) => (
+                                                      <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
+                                                        <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? '#e8f5e9' : '#fff3cd', color: s.quiz_score >=6 ? 'green' : '#856404', borderRadius:'15px', fontSize:'0.8rem'}}>
+                                                            <FaStar/> Score: {s.quiz_score}/10
+                                                        </div>
+                                                        {s.quiz_score < 6 && (
+                                                            <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #ccc', borderRadius:'5px', background:'white', display:'flex', alignItems:'center', gap:'4px'}}>
+                                                                <FaRedo size={10}/> Retake
+                                                            </button>
+                                                        )}
                                                       </div>
                                                   ))}
+
+                                                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
+                                                      {folder.subfolders[subNode].resources.map(res => (
+                                                          <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'white', border:'1px solid #eee', borderRadius:'8px'}}>
+                                                              <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'#333', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
+                                                                  {res.resource_type === 'video' ? <FaVideo color="#d32f2f"/> : res.resource_type === 'article' ? <FaGlobe color="#28a745"/> : <FaFilePdf color="#ffc107"/>}
+                                                                  <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
+                                                              </a>
+                                                              <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#ccc', padding:'0 5px'}}>
+                                                                  <FaTrash size={12}/>
+                                                              </button>
+                                                          </div>
+                                                      ))}
+                                                  </div>
                                               </div>
-                                          </div>
-                                      ))}
+                                          );
+                                      })}
                                   </div>
                               )}
                           </div>
@@ -238,7 +278,7 @@ function ProfilePage() {
                   })}
               </div>
           ) : (
-              // ASSESSMENTS TAB - Universal Retake
+              // ASSESSMENTS TAB
               <div>
                   {allScores.length === 0 ? <p>No assessments taken yet.</p> : (
                       <div style={{display:'grid', gap:'15px'}}>
@@ -251,7 +291,6 @@ function ProfilePage() {
                                   <div style={{textAlign:'right', display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'5px'}}>
                                       <h2 style={{margin:0, color: score.quiz_score >=6 ? 'green' : 'orange'}}>{score.quiz_score}/10</h2>
                                       
-                                      {/* RETAKE BUTTON FOR EVERY ASSESSMENT */}
                                       <button onClick={() => handleRetake(score.topic, score.node_label)} style={{padding:'5px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
                                           <FaRedo/> Retake
                                       </button>
@@ -268,7 +307,7 @@ function ProfilePage() {
           <AssessmentModal 
             mainTopic={activeQuizData.mainTopic} 
             subTopic={activeQuizData.subTopic}
-            questionCount={10} // Retakes are always Full Exams
+            questionCount={10} 
             onClose={() => setShowQuiz(false)}
             onComplete={handleQuizComplete}
           />
