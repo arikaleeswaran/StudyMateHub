@@ -41,7 +41,7 @@ try:
 except:
     youtube_client = None
 
-# --- HELPER: JSON PARSER ---
+# --- HELPER FUNCTIONS ---
 
 
 def parse_json_safely(text, expected_type="dict"):
@@ -63,8 +63,6 @@ def parse_json_safely(text, expected_type="dict"):
     except:
         return None
 
-# --- HELPER: SMART KEYWORD EXTRACTOR ---
-
 
 def get_smart_search_term(long_text):
     try:
@@ -79,13 +77,10 @@ def get_smart_search_term(long_text):
     except:
         return " ".join(long_text.split()[:4])
 
-# --- HELPER: YOUTUBE (UPDATED FOR PANIC MODE) ---
-
 
 def get_youtube_videos(topic, mode='standard', max_results=5):
     search_term = get_smart_search_term(topic)
 
-    # 🆕 ADJUST QUERY FOR PANIC MODE
     if mode == 'panic':
         query = f"{search_term} crash course in 10 minutes"
     else:
@@ -115,8 +110,6 @@ def get_youtube_videos(topic, mode='standard', max_results=5):
                 break
             duration_str = item['contentDetails']['duration']
 
-            # 🆕 FILTER: In Panic Mode, skip long videos (> 20 mins)
-            # (Simple check: if 'H' is in duration, it's an hour long)
             if mode == 'panic' and "H" in duration_str:
                 continue
 
@@ -132,15 +125,11 @@ def get_youtube_videos(topic, mode='standard', max_results=5):
     except:
         return []
 
-# --- HELPER: ARTICLE SCRAPER (UPDATED) ---
-
 
 def scrape_articles(topic, mode='standard', max_results=4):
     smart_topic = get_smart_search_term(topic)
 
-    # 🆕 ADJUST QUERY
     suffix = "cheat sheet summary" if mode == 'panic' else "tutorial geeksforgeeks w3schools"
-
     url = f"https://html.duckduckgo.com/html/?q={smart_topic} {suffix}"
     headers = {'User-Agent': 'Mozilla/5.0'}
     articles = []
@@ -162,7 +151,6 @@ def scrape_articles(topic, mode='standard', max_results=4):
 
     if not articles:
         safe_topic = urllib.parse.quote(smart_topic)
-        # 🆕 FALLBACKS
         if mode == 'panic':
             articles = [
                 {"title": f"⚡ Quick Ref: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+quick+reference",
@@ -183,15 +171,11 @@ def scrape_articles(topic, mode='standard', max_results=4):
             ]
     return articles
 
-# --- HELPER: PDF/CHEAT SHEETS ---
-
 
 def get_pdfs(topic, mode='standard', max_results=4):
     smart_topic = get_smart_search_term(topic)
     pdfs = []
     headers = {'User-Agent': 'Mozilla/5.0'}
-
-    # 🆕 ALWAYS SEARCH CHEAT SHEETS
     search_queries = [f"{smart_topic} cheat sheet filetype:pdf",
                       f"{smart_topic} lecture notes filetype:pdf"]
 
@@ -268,7 +252,6 @@ def get_recommendations():
             ])
         return jsonify(sorted_recs)
     except Exception as e:
-        print(f"Rec Error: {e}")
         return jsonify([])
 
 
@@ -303,34 +286,63 @@ def save_resource():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ✅ CORRECT: Single definition for submit_progress
+
 
 @app.route('/api/submit_progress', methods=['POST'])
 def submit_progress():
     data = request.json
     feedback = data.get('feedback', '')
+    user_id = data.get('user_id')
+    username = data.get('username', 'Anonymous')
+    score = data.get('score', 0)
+
     blob = TextBlob(feedback)
     try:
+        # 1. Save detailed progress
         supabase.table('node_progress').insert({
-            "user_id": data.get('user_id'),
+            "user_id": user_id,
             "topic": data.get('topic', 'General').strip().title(),
             "node_label": data.get('node_label'),
-            "quiz_score": data.get('score'),
+            "quiz_score": score,
             "feedback_text": feedback,
             "sentiment_score": blob.sentiment.polarity
         }).execute()
+
+        # 2. Update Leaderboard (Fail-safe)
+        try:
+            existing = supabase.table('leaderboard').select(
+                '*').eq('user_id', user_id).execute()
+            if existing.data:
+                new_score = existing.data[0]['score'] + score
+                supabase.table('leaderboard').update(
+                    {"score": new_score, "full_name": username}).eq('user_id', user_id).execute()
+            else:
+                supabase.table('leaderboard').insert(
+                    {"user_id": user_id, "full_name": username, "score": score}).execute()
+        except Exception as lb_error:
+            print(f"Leaderboard Error: {lb_error}")
+
         return jsonify({"message": "Saved"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ✅ UPDATED: /api/roadmap NOW HANDLES VIBE CHECK
+
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    try:
+        response = supabase.table('leaderboard').select(
+            '*').order('score', desc=True).limit(10).execute()
+        return jsonify(response.data)
+    except Exception as e:
+        return jsonify([])
 
 
 @app.route('/api/roadmap', methods=['GET'])
 def get_roadmap():
     topic = request.args.get('topic', '').strip().title()
-    mode = request.args.get('mode', 'standard')  # 🆕 Read mode
+    mode = request.args.get('mode', 'standard')
 
-    # If standard, try to load from DB first
     if mode == 'standard':
         try:
             existing = supabase.table('user_roadmaps').select(
@@ -340,9 +352,7 @@ def get_roadmap():
         except:
             pass
 
-    # 🆕 DYNAMIC PROMPT LOGIC
     if mode == 'panic':
-        print(f"🚨 Generating PANIC MODE Roadmap for: {topic}")
         prompt = f"""
         The user has an EXAM TOMORROW on '{topic}'. 
         Create a customized 'Crash Course' learning path with exactly 4 steps.
@@ -351,7 +361,6 @@ def get_roadmap():
         Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Core Concept 1"}}, ... ] }}
         """
     else:
-        print(f"🌱 Generating Standard Roadmap for: {topic}")
         prompt = f"""
         Create a comprehensive, linear 7-step learning path for '{topic}'.
         Start from basics and progress to advanced.
@@ -383,8 +392,6 @@ def get_quiz():
         return jsonify(data if data else [])
     except:
         return jsonify([{"question": "Error generating quiz", "options": ["OK"], "correct_answer": 0}])
-
-# ✅ UPDATED: Pass 'mode' to get_resources
 
 
 @app.route('/api/resources', methods=['GET'])

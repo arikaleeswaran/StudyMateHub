@@ -105,7 +105,14 @@ function RoadmapGraph() {
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            await axios.post(`${baseUrl}/api/submit_progress`, { user_id: user.id, topic: topic, node_label: checkNode.label, score: score, feedback: feedback });
+            await axios.post(`${baseUrl}/api/submit_progress`, {
+                user_id: user.id, 
+                username: user.user_metadata?.full_name || user.email.split('@')[0], // ✅ SEND NAME
+                topic: topic, 
+                node_label: checkNode.label, 
+                score: score, 
+                feedback: feedback
+            });
         } catch(e) { console.error(e); }
     }
     let passed = quizType === 'diagnostic' ? score >= 3 : score >= 6; 

@@ -104,7 +104,12 @@ function ProfilePage() {
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/submit_progress`, {
-            user_id: user.id, topic: activeQuizData.mainTopic, node_label: activeQuizData.subTopic, score: score, feedback: feedback
+            user_id: user.id, 
+            username: user.user_metadata?.full_name || user.email.split('@')[0], // ✅ SEND NAME
+            topic: topic, 
+            node_label: checkNode.label, 
+            score: score, 
+            feedback: feedback
         });
         alert(`Score Saved: ${score}/10`);
         fetchData(); 

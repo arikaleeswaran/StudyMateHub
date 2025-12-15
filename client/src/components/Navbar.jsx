@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { FaBrain, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
+import { FaBrain, FaUserCircle, FaSignOutAlt,FaTrophy } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
@@ -23,6 +23,9 @@ function Navbar() {
             <>
                 <button onClick={() => navigate('/profile')} style={styles.navButton}>
                     <FaUserCircle size={18} /> Dashboard
+                </button>
+                <button onClick={() => navigate('/leaderboard')} style={styles.navButton}>
+                    <FaTrophy size={18} color="#FFD700" /> Leaderboard
                 </button>
                 <button onClick={handleLogout} style={{...styles.navButton, background:'rgba(220, 53, 69, 0.2)', borderColor:'rgba(220, 53, 69, 0.3)', color: '#ff6b6b'}}>
                     <FaSignOutAlt />
