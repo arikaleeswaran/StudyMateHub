@@ -63,14 +63,10 @@ def parse_json_safely(text, expected_type="dict"):
     except:
         return None
 
-# --- HELPER: SMART KEYWORD EXTRACTOR (NEW) ---
+# --- HELPER: SMART KEYWORD EXTRACTOR ---
 
 
 def get_smart_search_term(long_text):
-    """
-    Uses AI to turn a long description into a 3-5 word search query.
-    Example: "Operating System Process Management... (long text)" -> "OS Process Management"
-    """
     try:
         prompt = f"Extract the core technical topic from this text into a 3-5 word search query. Return ONLY the raw string, no quotes: '{long_text}'"
         completion = groq_client.chat.completions.create(
@@ -81,21 +77,25 @@ def get_smart_search_term(long_text):
         )
         return completion.choices[0].message.content.strip().replace('"', '')
     except:
-        # Fallback: Just take the first 4 words if AI fails
         return " ".join(long_text.split()[:4])
 
-# --- HELPER: YOUTUBE ---
+# --- HELPER: YOUTUBE (UPDATED FOR PANIC MODE) ---
 
 
-def get_youtube_videos(topic, max_results=5):
-    # Search uses the raw topic, or you can use smart_term here too if results are bad
+def get_youtube_videos(topic, mode='standard', max_results=5):
     search_term = get_smart_search_term(topic)
+
+    # 🆕 ADJUST QUERY FOR PANIC MODE
+    if mode == 'panic':
+        query = f"{search_term} crash course in 10 minutes"
+    else:
+        query = f"{search_term} tutorial"
 
     if not youtube_client:
         return []
     try:
         search_request = youtube_client.search().list(
-            q=f"{search_term} tutorial", part='snippet', type='video',
+            q=query, part='snippet', type='video',
             maxResults=15, relevanceLanguage='en', videoCategoryId='27'
         )
         search_response = search_request.execute()
@@ -114,6 +114,12 @@ def get_youtube_videos(topic, max_results=5):
             if len(videos) >= max_results:
                 break
             duration_str = item['contentDetails']['duration']
+
+            # 🆕 FILTER: In Panic Mode, skip long videos (> 20 mins)
+            # (Simple check: if 'H' is in duration, it's an hour long)
+            if mode == 'panic' and "H" in duration_str:
+                continue
+
             if "M" in duration_str:
                 videos.append({
                     "title": item['snippet']['title'],
@@ -129,16 +135,14 @@ def get_youtube_videos(topic, max_results=5):
 # --- HELPER: ARTICLE SCRAPER (UPDATED) ---
 
 
-def scrape_articles(topic, max_results=4):
-
-    # 1. GENERATE SMART KEYWORDS (The Fix)
+def scrape_articles(topic, mode='standard', max_results=4):
     smart_topic = get_smart_search_term(topic)
-    print(f"🔍 Original: {topic[:30]}... | Smart: {smart_topic}")  # Debug print
 
-    # Try scraping first with smart topic
-    url = f"https://html.duckduckgo.com/html/?q={smart_topic} tutorial geeksforgeeks w3schools"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0'}
+    # 🆕 ADJUST QUERY
+    suffix = "cheat sheet summary" if mode == 'panic' else "tutorial geeksforgeeks w3schools"
+
+    url = f"https://html.duckduckgo.com/html/?q={smart_topic} {suffix}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
     articles = []
 
     try:
@@ -150,60 +154,46 @@ def scrape_articles(topic, max_results=4):
                 snippet = item.find('a', class_='result__snippet')
                 if title and snippet:
                     articles.append({
-                        "title": title.text,
-                        "url": title['href'],
-                        "snippet": snippet.text,
-                        "type": "article"
+                        "title": title.text, "url": title['href'],
+                        "snippet": snippet.text, "type": "article"
                     })
     except:
         pass
 
-    # --- FALLBACK: USE SMART LINKS WITH KEYWORDS ---
     if not articles:
-        safe_topic = urllib.parse.quote(smart_topic)  # Use the short keywords!
-
-        articles = [
-            {
-                "title": f"GeeksforGeeks: {smart_topic}",
-                "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}",
-                "type": "article",
-                "snippet": "Click to search for tutorials on GeeksforGeeks."
-            },
-            {
-                "title": f"W3Schools: Learn {smart_topic}",
-                # Use Google Site Search for W3Schools (better than internal)
-                "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}",
-                "type": "article",
-                "snippet": "Beginner-friendly guides and references."
-            },
-            {
-                "title": f"Medium: Articles on {smart_topic}",
-                "url": f"https://medium.com/search?q={safe_topic}",
-                "type": "article",
-                "snippet": "Community-written insights."
-            },
-            {
-                "title": f"Dev.to: Guides for {smart_topic}",
-                "url": f"https://dev.to/search?q={safe_topic}",
-                "type": "article",
-                "snippet": "Practical tutorials from developers."
-            }
-        ]
+        safe_topic = urllib.parse.quote(smart_topic)
+        # 🆕 FALLBACKS
+        if mode == 'panic':
+            articles = [
+                {"title": f"⚡ Quick Ref: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+quick+reference",
+                    "type": "article", "snippet": "Fast facts."},
+                {"title": f"📝 Exam Notes: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+exam+notes",
+                 "type": "article", "snippet": "Revision notes."},
+            ]
+        else:
+            articles = [
+                {"title": f"GeeksforGeeks: {smart_topic}", "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}",
+                    "type": "article", "snippet": "Click to search."},
+                {"title": f"W3Schools: Learn {smart_topic}", "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}",
+                 "type": "article", "snippet": "Beginner guides."},
+                {"title": f"Medium: Articles on {smart_topic}", "url": f"https://medium.com/search?q={safe_topic}",
+                 "type": "article", "snippet": "Community insights."},
+                {"title": f"Dev.to: Guides for {smart_topic}", "url": f"https://dev.to/search?q={safe_topic}",
+                 "type": "article", "snippet": "Practical tutorials."}
+            ]
     return articles
 
-# --- HELPER: PDF/CHEAT SHEETS (UPDATED) ---
+# --- HELPER: PDF/CHEAT SHEETS ---
 
 
-def get_pdfs(topic, max_results=4):
-    smart_topic = get_smart_search_term(topic)  # Use smart topic here too
+def get_pdfs(topic, mode='standard', max_results=4):
+    smart_topic = get_smart_search_term(topic)
     pdfs = []
     headers = {'User-Agent': 'Mozilla/5.0'}
 
-    # Search specifically for PDF files
-    search_queries = [
-        f"{smart_topic} cheat sheet filetype:pdf",
-        f"{smart_topic} lecture notes filetype:pdf"
-    ]
+    # 🆕 ALWAYS SEARCH CHEAT SHEETS
+    search_queries = [f"{smart_topic} cheat sheet filetype:pdf",
+                      f"{smart_topic} lecture notes filetype:pdf"]
 
     for query in search_queries:
         if len(pdfs) >= 3:
@@ -224,22 +214,20 @@ def get_pdfs(topic, max_results=4):
         except:
             pass
 
-    # Fallback Shortcuts
     safe_topic = urllib.parse.quote(smart_topic)
     if len(pdfs) < 4:
         smart_links = [
-            {"title": f"🔍 {smart_topic} Cheat Sheet (Google)",
-             "url": f"https://www.google.com/search?q={safe_topic}+cheat+sheet+filetype:pdf", "type": "PDF"},
-            {"title": f"🎓 {smart_topic} Lecture Notes (PDF)",
-             "url": f"https://www.google.com/search?q={safe_topic}+lecture+notes+filetype:pdf", "type": "PDF"},
-            {"title": f"📝 {smart_topic} Interview Qs (PDF)",
-             "url": f"https://www.google.com/search?q={safe_topic}+interview+questions+filetype:pdf", "type": "PDF"}
+            {"title": f"🔍 {smart_topic} Cheat Sheet",
+                "url": f"https://www.google.com/search?q={safe_topic}+cheat+sheet+filetype:pdf", "type": "PDF"},
+            {"title": f"🎓 {smart_topic} Lecture Notes",
+                "url": f"https://www.google.com/search?q={safe_topic}+lecture+notes+filetype:pdf", "type": "PDF"},
+            {"title": f"📝 {smart_topic} Interview Qs",
+                "url": f"https://www.google.com/search?q={safe_topic}+interview+questions+filetype:pdf", "type": "PDF"}
         ]
         for link in smart_links:
             if len(pdfs) >= max_results:
                 break
             pdfs.append(link)
-
     return pdfs
 
 # --- API ROUTES ---
@@ -334,11 +322,42 @@ def submit_progress():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ✅ UPDATED: /api/roadmap NOW HANDLES VIBE CHECK
+
 
 @app.route('/api/roadmap', methods=['GET'])
 def get_roadmap():
     topic = request.args.get('topic', '').strip().title()
-    prompt = f"""Create a linear 7-step learning path for '{topic}'. Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}"""
+    mode = request.args.get('mode', 'standard')  # 🆕 Read mode
+
+    # If standard, try to load from DB first
+    if mode == 'standard':
+        try:
+            existing = supabase.table('user_roadmaps').select(
+                'graph_data').eq('topic', topic).limit(1).execute()
+            if existing.data:
+                return jsonify(existing.data[0]['graph_data'])
+        except:
+            pass
+
+    # 🆕 DYNAMIC PROMPT LOGIC
+    if mode == 'panic':
+        print(f"🚨 Generating PANIC MODE Roadmap for: {topic}")
+        prompt = f"""
+        The user has an EXAM TOMORROW on '{topic}'. 
+        Create a customized 'Crash Course' learning path with exactly 4 steps.
+        Focus ONLY on the high-yield, most critical concepts that appear in exams.
+        Skip the history/intro. Go straight to the hard/important stuff.
+        Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Core Concept 1"}}, ... ] }}
+        """
+    else:
+        print(f"🌱 Generating Standard Roadmap for: {topic}")
+        prompt = f"""
+        Create a comprehensive, linear 7-step learning path for '{topic}'.
+        Start from basics and progress to advanced.
+        Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}
+        """
+
     try:
         completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
                                                          {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
@@ -365,16 +384,18 @@ def get_quiz():
     except:
         return jsonify([{"question": "Error generating quiz", "options": ["OK"], "correct_answer": 0}])
 
+# ✅ UPDATED: Pass 'mode' to get_resources
+
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
-    topic = request.args.get('topic')  # This is the long string
+    topic = request.args.get('topic')
+    mode = request.args.get('mode', 'standard')
+
     return jsonify({
-        "videos": get_youtube_videos(topic),
-        # Now calls get_smart_search_term internally
-        "articles": scrape_articles(topic),
-        # Now calls get_smart_search_term internally
-        "pdfs": get_pdfs(topic)
+        "videos": get_youtube_videos(topic, mode),
+        "articles": scrape_articles(topic, mode),
+        "pdfs": get_pdfs(topic, mode)
     })
 
 

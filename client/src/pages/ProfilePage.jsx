@@ -6,12 +6,15 @@ import axios from 'axios';
 import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo, FaExclamationTriangle, FaUserFriends, FaFire, FaPlus } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import Navbar from '../components/Navbar'; // ✅ Import Navbar
+import Navbar from '../components/Navbar'; 
 
 function ProfilePage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   
+  // ✅ EXTRACT USER NAME
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Scholar";
+
   const [folders, setFolders] = useState({});
   const [allScores, setAllScores] = useState([]);
   const [userRoadmaps, setUserRoadmaps] = useState([]); 
@@ -154,24 +157,28 @@ function ProfilePage() {
   const uniqueKeys = Object.keys(folders);
 
   return (
-    // ✅ 1. Outer Container: Full Width, No Padding
     <div style={{ width: '100vw', minHeight: '100vh', background: 'white', display: 'flex', flexDirection: 'column' }}>
       
-      {/* ✅ 2. Navbar: Stays at the top, full width */}
+      {/* Navbar */}
       <div style={{ width: '100%', position: 'sticky', top: 0, zIndex: 100 }}>
         <Navbar />
       </div>
 
-      {/* ✅ 3. Content Container: Centered, with padding and max-width */}
+      {/* Main Content */}
       <div style={{ padding: '40px', maxWidth: '1000px', width: '100%', margin: '0 auto', fontFamily: 'Segoe UI', flex: 1 }}>
         
-        {/* Header Section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        {/* ✅ UPDATED Header Section */}
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '30px' }}>
+          <button onClick={() => navigate(-1)} style={{background:'none', border:'none', fontSize:'1rem', cursor:'pointer', color:'#555', display:'flex', alignItems:'center', gap:'5px', alignSelf:'flex-start', marginBottom:'10px'}} title="Go Back">
+            <FaArrowLeft/> Back
+          </button>
+          
           <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-              <button onClick={() => navigate(-1)} style={{background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer', color:'#555'}} title="Go Back"><FaArrowLeft/></button>
-              <h1 style={{ margin: 0 }}>My Library</h1>
+              <h1 style={{ margin: 0, fontSize: '2.5rem', background: 'linear-gradient(90deg, #333, #555)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                 👋 Hi, {userName}!
+              </h1>
           </div>
-          {/* Removed old Logout button, it's in Navbar now */}
+          <p style={{ color: '#666', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
         </div>
 
         {/* Recommendations Section */}
@@ -328,7 +335,7 @@ function ProfilePage() {
         )}
       </div>
 
-      {/* ✅ MODALS */}
+      {/* Modals */}
       <ConfirmationModal 
         isOpen={deleteConfirm.show}
         title={`Delete "${deleteConfirm.title}"?`}

@@ -1,38 +1,38 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaRocket, FaLightbulb } from 'react-icons/fa';
-import Navbar from '../components/Navbar'; // ✅ Imports your new reusable Navbar
+import { FaSearch, FaRocket, FaLightbulb, FaFire } from 'react-icons/fa';
+import Navbar from '../components/Navbar'; 
 
 function HomePage() {
   const [topic, setTopic] = useState('');
+  const [isPanicMode, setIsPanicMode] = useState(false); // 🆕 Vibe State
   const navigate = useNavigate();
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (topic.trim()) {
-      navigate(`/roadmap/${topic}`);
+      // 🆕 Pass mode as a query parameter
+      const mode = isPanicMode ? 'panic' : 'standard';
+      navigate(`/roadmap/${topic}?mode=${mode}`);
     }
   };
 
   const handleQuickClick = (tag) => {
-    navigate(`/roadmap/${tag}`);
+    navigate(`/roadmap/${tag}?mode=standard`);
   };
 
   return (
     <div style={styles.container}>
       
-      {/* ✅ REUSABLE NAVBAR */}
       <div style={{position: 'absolute', top: 0, width: '100%', zIndex: 10}}>
         <Navbar />
       </div>
 
-      {/* --- HERO CONTENT --- */}
       <div style={styles.heroContent}>
         
-        {/* Badge */}
         <div style={styles.badge}>
             <FaRocket color="#ffc107" /> 
-            <span>AI-Powered Learning V2.0</span>
+            <span>AI-Powered Learning</span>
         </div>
 
         <h1 style={styles.title}>
@@ -51,19 +51,42 @@ function HomePage() {
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="What do you want to learn today? (e.g., Python, DevOps)"
+            placeholder="What do you want to learn today?"
             style={styles.input}
           />
           <button type="submit" style={styles.searchButton}>
-            Generate Map
+            Generate
           </button>
         </form>
+
+        {/* --- 🆕 VIBE CHECK SWITCH --- */}
+        <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+            <span style={{ color: isPanicMode ? '#64748b' : '#00d2ff', fontWeight: 'bold' }}>🌱 Just Curious</span>
+            
+            <div 
+                onClick={() => setIsPanicMode(!isPanicMode)}
+                style={{
+                    width: '50px', height: '26px', background: isPanicMode ? '#dc3545' : '#1e293b',
+                    borderRadius: '20px', border: '1px solid #555', cursor: 'pointer', position: 'relative', transition: 'all 0.3s'
+                }}
+            >
+                <div style={{
+                    width: '20px', height: '20px', background: 'white', borderRadius: '50%',
+                    position: 'absolute', top: '2px', left: isPanicMode ? '26px' : '2px', transition: 'all 0.3s',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+                }} />
+            </div>
+
+            <span style={{ color: isPanicMode ? '#dc3545' : '#64748b', fontWeight: 'bold', display:'flex', alignItems:'center', gap:'5px' }}>
+                <FaFire /> Exam Panic!
+            </span>
+        </div>
 
         {/* --- TRENDING TAGS --- */}
         <div style={styles.tagsContainer}>
             <span style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '5px' }}>Trending:</span>
             <div style={styles.tagsWrapper}>
-                {['Machine Learning', 'React JS', 'System Design', 'Cybersecurity', 'Data Structures'].map((tag, i) => (
+                {['Machine Learning', 'React JS', 'System Design', 'Cybersecurity'].map((tag, i) => (
                     <button key={i} onClick={() => handleQuickClick(tag)} style={styles.tag}>
                         {tag}
                     </button>
@@ -73,16 +96,16 @@ function HomePage() {
 
       </div>
 
-      {/* --- FOOTER --- */}
       <div style={styles.footerInfo}>
-          <p><FaLightbulb color="#ffeb3b"/> Powered by Llama-3 & Groq AI</p>
+          <p><FaLightbulb color="#ffeb3b"/> Powered by StudyMateHub</p>
       </div>
 
     </div>
   );
 }
 
-// --- STYLES ---
+// ... (Keep existing styles) ...
+// Add styles if you changed them, otherwise reuse the previous styles object.
 const styles = {
   container: {
     width: '100vw',

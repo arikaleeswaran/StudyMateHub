@@ -1,18 +1,18 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { getRoadmap } from '../services/api';
 import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
-import Navbar from '../components/Navbar'; // ✅ IMPORT NAVBAR
-import Toast from '../components/Toast';   // ✅ IMPORT TOAST
+import Navbar from '../components/Navbar';
+import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase'; 
 
 function RoadmapGraph() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ Hook to read URL params
   const { topic } = useParams();
   
   const [nodes, setNodes] = useState([]);
@@ -26,7 +26,7 @@ function RoadmapGraph() {
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizType, setQuizType] = useState('full'); 
   const [checkNode, setCheckNode] = useState(null);
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' }); // ✅ TOAST STATE
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   
   const [loadingResources, setLoadingResources] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
@@ -34,14 +34,32 @@ function RoadmapGraph() {
   const mapFetched = useRef(false);
 
   useEffect(() => {
-    if (mapFetched.current === topic) return;
+    // We reset mapFetched if the topic OR the mode changes
+    if (mapFetched.current === topic + location.search) return;
+    
     const init = async () => {
-        mapFetched.current = topic;
+        mapFetched.current = topic + location.search;
         setMapLoading(true);
+        
+        // ✅ 1. DETECT PANIC MODE
+        const params = new URLSearchParams(location.search);
+        const mode = params.get('mode') || 'standard';
+
         try {
-            const data = await getRoadmap(topic);
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+            
+            // ✅ 2. PASS MODE TO BACKEND
+            const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}`);
+            const data = res.data;
+
             if (data && data.nodes) setNodes(data.nodes);
             else setNodes([{id:'1', label:`${topic} Basics`}]);
+
+            // ✅ 3. NOTIFY USER OF MODE
+            if (mode === 'panic') {
+                showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
+            }
+
         } catch(e) { console.error(e); }
 
         if (user) {
@@ -58,7 +76,7 @@ function RoadmapGraph() {
         setMapLoading(false);
     };
     init();
-  }, [topic, user]);
+  }, [topic, user, location.search]); // ✅ Re-run if URL params change
 
   useEffect(() => {
       if (nodes.length > 0) {
@@ -67,7 +85,6 @@ function RoadmapGraph() {
       }
   }, [nodes, completedNodes]);
 
-  // ✅ HELPER: SHOW TOAST
   const showNotification = (msg, type='success') => {
       setToast({ show: true, message: msg, type });
   };
@@ -79,7 +96,7 @@ function RoadmapGraph() {
         await axios.post(`${baseUrl}/api/save_roadmap`, {
             user_id: user.id, topic: topic, graph_data: { nodes: nodes }
         });
-        showNotification("Roadmap saved successfully!"); // ✅ Custom Toast
+        showNotification("Roadmap saved successfully!");
     } catch (e) { showNotification("Error saving roadmap", "error"); }
   };
 
@@ -96,7 +113,7 @@ function RoadmapGraph() {
             url: item.url,
             thumbnail: item.thumbnail || ''
         });
-        showNotification("Resource added to Library! 📚"); // ✅ Custom Toast
+        showNotification("Resource added to Library! 📚");
     } catch(e) { showNotification("Error saving resource", "error"); }
   };
 
@@ -155,9 +172,15 @@ function RoadmapGraph() {
     setSelectedNode(node);
     setResources({ videos: [], articles: [], pdfs: [] }); 
     setLoadingResources(true);
+
+    // ✅ EXTRACT MODE TO PASS TO RESOURCES API
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode') || 'standard';
+
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        const res = await axios.get(`${baseUrl}/api/resources?topic=${topic} ${node.label}`);
+        // ✅ PASSING MODE PARAMETER
+        const res = await axios.get(`${baseUrl}/api/resources?topic=${topic} ${node.label}&mode=${mode}`);
         setResources(res.data);
     } catch(e) { console.error(e); } 
     finally { 
@@ -175,12 +198,12 @@ function RoadmapGraph() {
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
       
-      {/* ✅ NAVBAR: Fixed at top */}
+      {/* Navbar */}
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}>
          <Navbar />
       </div>
 
-      {/* ✅ TOAST NOTIFICATION */}
+      {/* Toast */}
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
       {/* Header */}
