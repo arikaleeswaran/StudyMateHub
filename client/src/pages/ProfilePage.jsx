@@ -12,7 +12,6 @@ function ProfilePage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   
-  // ✅ EXTRACT USER NAME
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Scholar";
 
   const [folders, setFolders] = useState({});
@@ -23,7 +22,7 @@ function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState([]);
 
-  // --- MODAL STATES ---
+  // Modal States
   const [showQuiz, setShowQuiz] = useState(false);
   const [activeQuizData, setActiveQuizData] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null, title: '' });
@@ -111,24 +110,16 @@ function ProfilePage() {
         fetchData(); 
       } catch(e) { console.error(e); }
   };
-
-  const handleDeleteRoadmap = (topic) => {
-      setDeleteConfirm({ show: true, type: 'roadmap', id: topic, title: topic });
-  };
-
-  const handleDeleteResource = (id) => {
-      setDeleteConfirm({ show: true, type: 'resource', id: id, title: 'this resource' });
-  };
+  
+  const handleDeleteRoadmap = (topic) => { setDeleteConfirm({ show: true, type: 'roadmap', id: topic, title: topic }); };
+  const handleDeleteResource = (id) => { setDeleteConfirm({ show: true, type: 'resource', id: id, title: 'this resource' }); };
 
   const executeDelete = async () => {
       setDeleteConfirm(prev => ({ ...prev, show: false }));
       try {
           const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-          if (deleteConfirm.type === 'roadmap') {
-              await axios.delete(`${baseUrl}/api/delete_roadmap?user_id=${user.id}&topic=${deleteConfirm.id}`);
-          } else {
-              await axios.delete(`${baseUrl}/api/delete_resource?id=${deleteConfirm.id}`);
-          }
+          if (deleteConfirm.type === 'roadmap') await axios.delete(`${baseUrl}/api/delete_roadmap?user_id=${user.id}&topic=${deleteConfirm.id}`);
+          else await axios.delete(`${baseUrl}/api/delete_resource?id=${deleteConfirm.id}`);
           fetchData(); 
       } catch(e) { alert("Error deleting."); }
   };
@@ -138,8 +129,7 @@ function ProfilePage() {
       const attempts = allScores.filter(s => normalize(s.topic) === normalize(topicTitle) && normalize(s.node_label) === normalize(nodeLabel));
       const hasPassed = attempts.some(s => s.quiz_score >= 6);
       const failCount = attempts.filter(s => s.quiz_score < 6).length;
-      const isWeak = failCount >= 2; 
-      return { isWeak, failCount, hasPassed };
+      return { isWeak: failCount >= 2, failCount, hasPassed };
   };
 
   const getProgress = (topicKey) => {
@@ -156,51 +146,61 @@ function ProfilePage() {
   const toggleFolder = (key) => setExpandedFolders(prev => ({ ...prev, [key]: !prev[key] }));
   const uniqueKeys = Object.keys(folders);
 
+  // Rank Logic
+  const totalScore = allScores.reduce((acc, curr) => acc + (curr.quiz_score || 0), 0);
+  const getRank = (score) => {
+      if (score > 150) return { title: "Tech Wizard", icon: "🧙‍♂️", color: "#9c27b0" };
+      if (score > 50) return { title: "Code Warrior", icon: "⚔️", color: "#ff9800" };
+      return { title: "Novice Scholar", icon: "🛡️", color: "#2196f3" };
+  };
+  const rank = getRank(totalScore);
+
   return (
-    <div style={{ width: '100vw', minHeight: '100vh', background: 'white', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100vw', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', color: 'white', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Navbar */}
       <div style={{ width: '100%', position: 'sticky', top: 0, zIndex: 100 }}>
         <Navbar />
       </div>
 
-      {/* Main Content */}
       <div style={{ padding: '40px', maxWidth: '1000px', width: '100%', margin: '0 auto', fontFamily: 'Segoe UI', flex: 1 }}>
         
-        {/* ✅ UPDATED Header Section */}
+        {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '30px' }}>
-          <button onClick={() => navigate(-1)} style={{background:'none', border:'none', fontSize:'1rem', cursor:'pointer', color:'#555', display:'flex', alignItems:'center', gap:'5px', alignSelf:'flex-start', marginBottom:'10px'}} title="Go Back">
+          <button onClick={() => navigate(-1)} style={{background:'none', border:'none', fontSize:'1rem', cursor:'pointer', color:'#aaa', display:'flex', alignItems:'center', gap:'5px', alignSelf:'flex-start', marginBottom:'10px'}} title="Go Back">
             <FaArrowLeft/> Back
           </button>
           
-          <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-              <h1 style={{ margin: 0, fontSize: '2.5rem', background: 'linear-gradient(90deg, #333, #555)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                 👋 Hi, {userName}!
-              </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+             <h1 style={{ margin: 0, fontSize: '2.5rem', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                👋 Hi, {userName}!
+             </h1>
+             <div style={{ padding: '5px 15px', background: rank.color, color: 'white', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '5px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+                <span style={{fontSize: '1.2rem'}}>{rank.icon}</span> {rank.title} (Lvl {Math.floor(totalScore / 10)})
+             </div>
           </div>
-          <p style={{ color: '#666', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
+          <p style={{ color: '#94a3b8', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
         </div>
 
-        {/* Recommendations Section */}
+        {/* Recommendations (Glassmorphism) */}
         {recommendations.length > 0 && (
-            <div style={{marginBottom:'40px', padding:'25px', background:'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius:'15px', color:'white', boxShadow:'0 4px 15px rgba(0,0,0,0.2)'}}>
+            <div style={{marginBottom:'40px', padding:'25px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius:'15px', color:'white', boxShadow:'0 4px 15px rgba(0,0,0,0.2)'}}>
                 <h2 style={{margin:'0 0 20px 0', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.4rem'}}>
-                    <FaUserFriends color="#FFD700"/> Students Like You Are Studying:
+                    <FaUserFriends color="#FFD700"/> Recommended for You:
                 </h2>
                 <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'20px'}}>
                     {recommendations.map((rec, i) => (
-                        <div key={i} style={{background:'rgba(255,255,255,0.95)', padding:'15px', borderRadius:'10px', color:'#333', display:'flex', flexDirection:'column', boxShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>
+                        <div key={i} style={{background:'rgba(255, 255, 255, 0.1)', padding:'15px', borderRadius:'10px', color:'white', display:'flex', flexDirection:'column'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px'}}>
-                                <span style={{fontSize:'0.75rem', fontWeight:'bold', textTransform:'uppercase', color:'#764ba2', background:'#f3e5f5', padding:'2px 8px', borderRadius:'4px'}}>{rec.topic}</span>
-                                <div style={{fontSize:'0.8rem', color:'#555', display:'flex', alignItems:'center', gap:'4px'}}><FaFire color="#ff5722"/> {rec.count} students</div>
+                                <span style={{fontSize:'0.75rem', fontWeight:'bold', textTransform:'uppercase', color:'#00d2ff', background:'rgba(0, 210, 255, 0.1)', padding:'2px 8px', borderRadius:'4px'}}>{rec.topic}</span>
+                                <div style={{fontSize:'0.8rem', color:'#aaa', display:'flex', alignItems:'center', gap:'4px'}}><FaFire color="#ff5722"/> {rec.count} peers</div>
                             </div>
                             <div style={{fontWeight:'bold', marginBottom:'15px', fontSize:'1rem', flex:1, lineHeight:'1.4', display:'flex', alignItems:'start', gap:'8px'}}>
-                                {rec.resource_type === 'video' ? <FaVideo color="#d32f2f" style={{marginTop:'3px'}}/> : <FaGlobe color="#28a745" style={{marginTop:'3px'}}/>}
+                                {rec.resource_type === 'video' ? <FaVideo color="#ff6b6b" style={{marginTop:'3px'}}/> : <FaGlobe color="#4caf50" style={{marginTop:'3px'}}/>}
                                 {rec.title}
                             </div>
                             <div style={{display:'flex', gap:'10px', marginTop:'auto'}}>
-                                <a href={rec.url} target="_blank" rel="noreferrer" style={{flex:1, padding:'10px', background:'#f0f2f5', textAlign:'center', borderRadius:'6px', textDecoration:'none', color:'#333', fontSize:'0.9rem', fontWeight:'bold', border:'1px solid #ddd'}}>View</a>
-                                <button onClick={() => handleSaveRecommendation(rec)} style={{flex:1, padding:'10px', background:'#28a745', border:'none', borderRadius:'6px', color:'white', cursor:'pointer', display:'flex', justifyContent:'center', alignItems:'center', gap:'6px', fontSize:'0.9rem', fontWeight:'bold', boxShadow:'0 2px 5px rgba(40,167,69,0.3)'}}>
+                                <a href={rec.url} target="_blank" rel="noreferrer" style={{flex:1, padding:'10px', background:'rgba(255,255,255,0.1)', textAlign:'center', borderRadius:'6px', textDecoration:'none', color:'white', fontSize:'0.9rem', fontWeight:'bold'}}>View</a>
+                                <button onClick={() => handleSaveRecommendation(rec)} style={{flex:1, padding:'10px', background:'#28a745', border:'none', borderRadius:'6px', color:'white', cursor:'pointer', display:'flex', justifyContent:'center', alignItems:'center', gap:'6px', fontSize:'0.9rem', fontWeight:'bold'}}>
                                     <FaPlus/> Save
                                 </button>
                             </div>
@@ -211,23 +211,22 @@ function ProfilePage() {
         )}
 
         {/* Tabs */}
-        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid #eee'}}>
-            <button onClick={() => setActiveTab('library')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'library' ? '3px solid #007bff' : 'none', fontWeight:'bold', color: activeTab === 'library' ? '#007bff' : '#555', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaBook/> My Library</button>
-            <button onClick={() => setActiveTab('assessments')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'assessments' ? '3px solid #007bff' : 'none', fontWeight:'bold', color: activeTab === 'assessments' ? '#007bff' : '#555', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaChartBar/> My Assessments</button>
+        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+            <button onClick={() => setActiveTab('library')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'library' ? '3px solid #00d2ff' : 'none', fontWeight:'bold', color: activeTab === 'library' ? '#00d2ff' : '#aaa', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaBook/> My Library</button>
+            <button onClick={() => setActiveTab('assessments')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'assessments' ? '3px solid #00d2ff' : 'none', fontWeight:'bold', color: activeTab === 'assessments' ? '#00d2ff' : '#aaa', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaChartBar/> My Assessments</button>
         </div>
 
         {/* Folders List */}
         {loading ? <p>Loading...</p> : (
             activeTab === 'library' ? (
-                uniqueKeys.length === 0 ? <div style={{textAlign:'center', padding:'50px', background:'#f9f9f9'}}><h3>No Saved Content 📂</h3></div> :
+                uniqueKeys.length === 0 ? <div style={{textAlign:'center', padding:'50px', color:'#666'}}><h3>No Saved Content 📂</h3></div> :
                 <div>
                     {uniqueKeys.map(key => {
                         const folder = folders[key];
                         const progress = getProgress(key); 
                         return (
-                            <div key={key} style={{ marginBottom: '20px', border: '1px solid #eee', borderRadius: '10px', overflow:'hidden' }}>
-                                <div style={{ padding: '20px', background: '#f8f9fa', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                    
+                            <div key={key} style={{ marginBottom: '20px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', overflow:'hidden', border:'1px solid rgba(255,255,255,0.1)' }}>
+                                <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div onClick={() => toggleFolder(key)} style={{display:'flex', flexDirection:'column', gap:'5px', flex:1, cursor:'pointer'}}>
                                       <div style={{display:'flex', alignItems:'center', gap:'10px', fontWeight:'bold', fontSize:'1.1rem'}}>
                                           {expandedFolders[key] ? <FaFolderOpen color="#ffc107" size={24}/> : <FaFolder color="#ffc107" size={24}/>}
@@ -235,52 +234,50 @@ function ProfilePage() {
                                       </div>
                                       {progress && (
                                           <div style={{width:'100%', maxWidth:'400px', marginTop:'5px'}}>
-                                              <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', color:'#666', marginBottom:'2px'}}>
+                                              <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', color:'#aaa', marginBottom:'2px'}}>
                                                   <span>{progress.percentage}% Complete</span>
-                                                  <span style={{color:'#007bff', display:'flex', alignItems:'center', gap:'4px'}}><FaRunning/> Next: {progress.current}</span>
+                                                  <span style={{color:'#00d2ff', display:'flex', alignItems:'center', gap:'4px'}}><FaRunning/> Next: {progress.current}</span>
                                               </div>
-                                              <div style={{width:'100%', height:'8px', background:'#e9ecef', borderRadius:'4px', overflow:'hidden'}}>
-                                                  <div style={{width: `${progress.percentage}%`, height:'100%', background: progress.percentage === 100 ? '#28a745' : '#007bff', transition:'width 0.5s ease'}}></div>
+                                              <div style={{width:'100%', height:'8px', background:'rgba(255,255,255,0.1)', borderRadius:'4px', overflow:'hidden'}}>
+                                                  <div style={{width: `${progress.percentage}%`, height:'100%', background: progress.percentage === 100 ? '#28a745' : '#00d2ff', transition:'width 0.5s ease'}}></div>
                                               </div>
                                           </div>
                                       )}
                                     </div>
-
-                                    <span style={{color:'#999', marginRight:'10px'}}>{expandedFolders[key] ? <FaChevronDown/> : <FaChevronRight/>}</span>
-                                    
+                                    <span style={{color:'#aaa', marginRight:'10px'}}>{expandedFolders[key] ? <FaChevronDown/> : <FaChevronRight/>}</span>
                                     {folder.hasRoadmap && (
-                                      <button onClick={() => handleDeleteRoadmap(folder.displayTitle)} style={{background:'none', border:'none', cursor:'pointer', color:'#dc3545', padding:'10px'}}>
+                                      <button onClick={() => handleDeleteRoadmap(folder.displayTitle)} style={{background:'none', border:'none', cursor:'pointer', color:'#ff6b6b', padding:'10px'}}>
                                           <FaTrash size={18} />
                                       </button>
                                     )}
                                 </div>
 
                                 {expandedFolders[key] && (
-                                    <div style={{ padding: '20px', background: 'white' }}>
+                                    <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)' }}>
                                         {folder.hasRoadmap && (
-                                            <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
+                                            <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
                                         )}
 
                                         {Object.keys(folder.subfolders).map(subNode => {
                                             const status = getNodeStatus(folder.displayTitle, subNode);
                                             return (
-                                                <div key={subNode} style={{ marginLeft: '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #dc3545' : '3px solid #eee' }}>
-                                                    <h4 style={{ margin: '0 0 10px 0', color: '#333', display:'flex', alignItems:'center', gap:'10px' }}>
-                                                      {status.hasPassed ? <FaCheckCircle color="green"/> : <span style={{width:'16px'}}></span>}
+                                                <div key={subNode} style={{ marginLeft: '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
+                                                    <h4 style={{ margin: '0 0 10px 0', color: 'white', display:'flex', alignItems:'center', gap:'10px' }}>
+                                                      {status.hasPassed ? <FaCheckCircle color="#28a745"/> : <span style={{width:'16px'}}></span>}
                                                       {subNode}
                                                       {status.isWeak && (
-                                                          <span style={{fontSize:'0.75rem', background:'#ffebee', color:'#c62828', padding:'4px 8px', borderRadius:'12px', border:'1px solid #ffcdd2', display:'flex', alignItems:'center', gap:'5px'}}>
-                                                              <FaExclamationTriangle/> Weak Zone ({status.failCount} fails)
+                                                          <span style={{fontSize:'0.75rem', background:'rgba(255, 107, 107, 0.2)', color:'#ff6b6b', padding:'4px 8px', borderRadius:'12px', border:'1px solid rgba(255, 107, 107, 0.3)', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                              <FaExclamationTriangle/> Weak Zone
                                                           </span>
                                                       )}
                                                     </h4>
                                                     
                                                     {folder.subfolders[subNode].scores.map((s, i) => (
                                                         <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
-                                                          <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? '#e8f5e9' : '#fff3cd', color: s.quiz_score >=6 ? 'green' : '#856404', borderRadius:'15px', fontSize:'0.8rem'}}>
+                                                          <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)', color: s.quiz_score >=6 ? '#28a745' : '#ffc107', borderRadius:'15px', fontSize:'0.8rem', border: s.quiz_score>=6?'1px solid rgba(40,167,69,0.3)':'1px solid rgba(255,193,7,0.3)'}}>
                                                               <FaStar/> Score: {s.quiz_score}/10
                                                           </div>
-                                                          <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid #ccc', borderRadius:'5px', background:'white', display:'flex', alignItems:'center', gap:'4px'}}>
+                                                          <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'5px', background:'rgba(255,255,255,0.05)', color:'white', display:'flex', alignItems:'center', gap:'4px'}}>
                                                               <FaRedo size={10}/> Retake
                                                           </button>
                                                         </div>
@@ -288,12 +285,12 @@ function ProfilePage() {
 
                                                     <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
                                                         {folder.subfolders[subNode].resources.map(res => (
-                                                            <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'white', border:'1px solid #eee', borderRadius:'8px'}}>
-                                                                <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'#333', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
-                                                                    {res.resource_type === 'video' ? <FaVideo color="#d32f2f"/> : res.resource_type === 'article' ? <FaGlobe color="#28a745"/> : <FaFilePdf color="#ffc107"/>}
+                                                            <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px'}}>
+                                                                <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
+                                                                    {res.resource_type === 'video' ? <FaVideo color="#ff6b6b"/> : res.resource_type === 'article' ? <FaGlobe color="#4caf50"/> : <FaFilePdf color="#ffc107"/>}
                                                                     <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
                                                                 </a>
-                                                                <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#ccc', padding:'0 5px'}}>
+                                                                <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', padding:'0 5px'}}>
                                                                     <FaTrash size={12}/>
                                                                 </button>
                                                             </div>
@@ -311,18 +308,18 @@ function ProfilePage() {
             ) : (
                 // ASSESSMENTS TAB
                 <div>
-                    {allScores.length === 0 ? <p>No assessments taken yet.</p> : (
+                    {allScores.length === 0 ? <p style={{color:'#aaa'}}>No assessments taken yet.</p> : (
                         <div style={{display:'grid', gap:'15px'}}>
                             {allScores.map(score => (
-                                <div key={score.id} style={{padding:'20px', border:'1px solid #eee', borderRadius:'10px', background:'white', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <div key={score.id} style={{padding:'20px', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', background:'rgba(255,255,255,0.05)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                     <div>
-                                        <h3 style={{margin:'0 0 5px 0'}}>{score.node_label}</h3>
-                                        <span style={{fontSize:'0.9rem', color:'#666', background:'#f0f0f0', padding:'2px 8px', borderRadius:'4px'}}>{score.topic || "Unknown Topic"}</span>
+                                        <h3 style={{margin:'0 0 5px 0', color:'white'}}>{score.node_label}</h3>
+                                        <span style={{fontSize:'0.9rem', color:'#aaa', background:'rgba(255,255,255,0.1)', padding:'2px 8px', borderRadius:'4px'}}>{score.topic || "Unknown Topic"}</span>
                                     </div>
                                     <div style={{textAlign:'right', display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'5px'}}>
-                                        <h2 style={{margin:0, color: score.quiz_score >=6 ? 'green' : 'orange'}}>{score.quiz_score}/10</h2>
+                                        <h2 style={{margin:0, color: score.quiz_score >=6 ? '#28a745' : '#ffc107'}}>{score.quiz_score}/10</h2>
                                         
-                                        <button onClick={() => handleRetake(score.topic, score.node_label)} style={{padding:'5px 15px', background:'#007bff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
+                                        <button onClick={() => handleRetake(score.topic, score.node_label)} style={{padding:'5px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
                                             <FaRedo/> Retake
                                         </button>
                                     </div>
@@ -335,7 +332,6 @@ function ProfilePage() {
         )}
       </div>
 
-      {/* Modals */}
       <ConfirmationModal 
         isOpen={deleteConfirm.show}
         title={`Delete "${deleteConfirm.title}"?`}
@@ -353,6 +349,12 @@ function ProfilePage() {
             onComplete={handleQuizComplete}
           />
       )}
+      <style>{`
+        @keyframes popIn {
+          from { transform: scale(0); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

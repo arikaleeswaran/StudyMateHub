@@ -12,7 +12,7 @@ import { supabase } from '../services/supabase';
 function RoadmapGraph() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); // ✅ Hook to read URL params
+  const location = useLocation();
   const { topic } = useParams();
   
   const [nodes, setNodes] = useState([]);
@@ -34,40 +34,23 @@ function RoadmapGraph() {
   const mapFetched = useRef(false);
 
   useEffect(() => {
-    // We reset mapFetched if the topic OR the mode changes
     if (mapFetched.current === topic + location.search) return;
-    
     const init = async () => {
         mapFetched.current = topic + location.search;
         setMapLoading(true);
-        
-        // ✅ 1. DETECT PANIC MODE
         const params = new URLSearchParams(location.search);
         const mode = params.get('mode') || 'standard';
-
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            
-            // ✅ 2. PASS MODE TO BACKEND
             const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}`);
             const data = res.data;
-
             if (data && data.nodes) setNodes(data.nodes);
             else setNodes([{id:'1', label:`${topic} Basics`}]);
-
-            // ✅ 3. NOTIFY USER OF MODE
-            if (mode === 'panic') {
-                showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
-            }
-
+            if (mode === 'panic') showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
         } catch(e) { console.error(e); }
 
         if (user) {
-            const { data } = await supabase.from('node_progress')
-                .select('node_label, quiz_score')
-                .eq('user_id', user.id)
-                .eq('topic', topic);
-            
+            const { data } = await supabase.from('node_progress').select('node_label, quiz_score').eq('user_id', user.id).eq('topic', topic);
             if (data) {
                 const passedNodes = data.filter(d => d.quiz_score >= 3).map(d => d.node_label);
                 setCompletedNodes(new Set(passedNodes));
@@ -76,7 +59,7 @@ function RoadmapGraph() {
         setMapLoading(false);
     };
     init();
-  }, [topic, user, location.search]); // ✅ Re-run if URL params change
+  }, [topic, user, location.search]);
 
   useEffect(() => {
       if (nodes.length > 0) {
@@ -85,17 +68,13 @@ function RoadmapGraph() {
       }
   }, [nodes, completedNodes]);
 
-  const showNotification = (msg, type='success') => {
-      setToast({ show: true, message: msg, type });
-  };
+  const showNotification = (msg, type='success') => { setToast({ show: true, message: msg, type }); };
 
   const handleSaveRoadmap = async () => {
     if (!user) { navigate('/auth'); return; }
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        await axios.post(`${baseUrl}/api/save_roadmap`, {
-            user_id: user.id, topic: topic, graph_data: { nodes: nodes }
-        });
+        await axios.post(`${baseUrl}/api/save_roadmap`, { user_id: user.id, topic: topic, graph_data: { nodes: nodes } });
         showNotification("Roadmap saved successfully!");
     } catch (e) { showNotification("Error saving roadmap", "error"); }
   };
@@ -105,60 +84,31 @@ function RoadmapGraph() {
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_resource`, {
-            user_id: user.id,
-            roadmap_topic: topic,
-            node_label: selectedNode.label,
-            resource_type: type,
-            title: item.title,
-            url: item.url,
-            thumbnail: item.thumbnail || ''
+            user_id: user.id, roadmap_topic: topic, node_label: selectedNode.label, resource_type: type, title: item.title, url: item.url, thumbnail: item.thumbnail || ''
         });
         showNotification("Resource added to Library! 📚");
     } catch(e) { showNotification("Error saving resource", "error"); }
   };
 
   const handleNodeClick = (node, index) => {
-    if (index > 0 && !completedNodes.has(nodes[index - 1].label)) {
-        showNotification("🔒 Complete previous module first!", "error");
-        return;
-    }
-    setCheckNode(node); 
-    setShowCheckModal(true); 
+    if (index > 0 && !completedNodes.has(nodes[index - 1].label)) { showNotification("🔒 Complete previous module first!", "error"); return; }
+    setCheckNode(node); setShowCheckModal(true); 
   };
 
-  const handleKnowsTopic = () => { 
-      setShowCheckModal(false); 
-      setQuizType('diagnostic'); 
-      setShowQuizModal(true); 
-  };
-
-  const handleNewTopic = () => { 
-      setShowCheckModal(false); 
-      fetchResources(checkNode); 
-  };
-  
-  const handleStartFullAssessment = () => {
-      setQuizType('full'); 
-      setShowQuizModal(true);
-  };
-
-  const handleUpgradeToFull = () => {
-      setQuizType('full');
-  };
+  const handleKnowsTopic = () => { setShowCheckModal(false); setQuizType('diagnostic'); setShowQuizModal(true); };
+  const handleNewTopic = () => { setShowCheckModal(false); fetchResources(checkNode); };
+  const handleStartFullAssessment = () => { setQuizType('full'); setShowQuizModal(true); };
+  const handleUpgradeToFull = () => { setQuizType('full'); };
 
   const handleQuizComplete = async (score, feedback) => {
     setShowQuizModal(false);
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            await axios.post(`${baseUrl}/api/submit_progress`, {
-                user_id: user.id, topic: topic, node_label: checkNode.label, score: score, feedback: feedback
-            });
+            await axios.post(`${baseUrl}/api/submit_progress`, { user_id: user.id, topic: topic, node_label: checkNode.label, score: score, feedback: feedback });
         } catch(e) { console.error(e); }
     }
-    
     let passed = quizType === 'diagnostic' ? score >= 3 : score >= 6; 
-
     if (passed) {
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
         showNotification("🎉 Module Passed! Unlocked next step.");
@@ -172,14 +122,10 @@ function RoadmapGraph() {
     setSelectedNode(node);
     setResources({ videos: [], articles: [], pdfs: [] }); 
     setLoadingResources(true);
-
-    // ✅ EXTRACT MODE TO PASS TO RESOURCES API
     const params = new URLSearchParams(location.search);
     const mode = params.get('mode') || 'standard';
-
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        // ✅ PASSING MODE PARAMETER
         const res = await axios.get(`${baseUrl}/api/resources?topic=${topic} ${node.label}&mode=${mode}`);
         setResources(res.data);
     } catch(e) { console.error(e); } 
@@ -196,27 +142,25 @@ function RoadmapGraph() {
   if (mapLoading) return <div className="spinner"></div>;
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100%', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', color:'white', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Navbar */}
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}>
          <Navbar />
       </div>
 
-      {/* Toast */}
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
       {/* Header */}
-      <div style={{ padding: '20px', borderBottom: '1px solid #eee', background: '#fafafa', position:'sticky', top:'70px', zIndex:50 }}> 
+      <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top:'70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
-            <h2 style={{ margin: '0 0 10px 0', color: '#333', textTransform: 'capitalize', textAlign:'center' }}>
-                🗺️ Path: <span style={{color: '#007bff'}}>{topic}</span>
+            <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center' }}>
+                🗺️ Path: <span style={{color: '#00d2ff'}}>{topic}</span>
             </h2>
-            <div style={{width:'100%', background:'#e9ecef', height:'10px', borderRadius:'5px', overflow:'hidden', marginBottom:'10px'}}>
+            <div style={{width:'100%', background:'rgba(255,255,255,0.1)', height:'10px', borderRadius:'5px', overflow:'hidden', marginBottom:'10px'}}>
                 <div style={{width:`${progress}%`, background:'#28a745', height:'100%', transition:'width 0.5s ease'}}></div>
             </div>
-            <p style={{textAlign:'center', fontSize:'0.9rem', color:'#666', margin:0}}>{progress}% Completed</p>
-            <button onClick={handleSaveRoadmap} style={{position: 'absolute', right: '0', top: '0', padding: '8px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>💾 Save Path</button>
+            <p style={{textAlign:'center', fontSize:'0.9rem', color:'#aaa', margin:0}}>{progress}% Completed</p>
+            <button onClick={handleSaveRoadmap} style={{position: 'absolute', right: '0', top: '0', padding: '8px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>💾 Save</button>
         </div>
       </div>
 
@@ -241,43 +185,42 @@ function RoadmapGraph() {
                                     style={{
                                         width: '180px', height: '180px',
                                         borderRadius: '50%',
-                                        background: isCompleted ? '#d4edda' : isSelected ? '#e3f2fd' : '#ffffff',
-                                        border: isLocked ? '3px solid #ccc' : isCompleted ? '3px solid #28a745' : isSelected ? '3px solid #007bff' : '3px solid #333',
-                                        color: '#333',
+                                        background: isCompleted ? 'rgba(40, 167, 69, 0.2)' : isSelected ? 'rgba(0, 210, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+                                        border: isLocked ? '3px solid #555' : isCompleted ? '3px solid #28a745' : isSelected ? '3px solid #00d2ff' : '3px solid rgba(255,255,255,0.2)',
+                                        color: 'white',
                                         display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
                                         padding: '15px', textAlign: 'center', 
                                         cursor: isLocked ? 'not-allowed' : 'pointer',
-                                        boxShadow: isSelected ? '0 0 15px rgba(0,123,255,0.4)' : '0 4px 6px rgba(0,0,0,0.1)',
+                                        boxShadow: isSelected ? '0 0 20px rgba(0,210,255,0.4)' : 'none',
                                         transition: 'all 0.3s ease', position: 'relative',
                                         wordBreak: 'break-word', overflow: 'hidden'
                                     }}
                                 >
-                                    {isLocked ? <FaLock size={20} color="#999" style={{marginBottom:'8px'}}/> : 
+                                    {isLocked ? <FaLock size={20} color="#777" style={{marginBottom:'8px'}}/> : 
                                      isCompleted ? <FaCheckCircle color="#28a745" size={24} style={{marginBottom:'8px'}} /> : null}
                                     <span style={{fontSize:'0.85rem', fontWeight:'bold', lineHeight:'1.3', padding:'0 5px'}}>
                                         {node.label}
                                     </span>
                                 </div>
-                                {i < row.length - 1 && (<div style={{margin:'0 20px', fontSize:'24px', color: isCompleted ? '#28a745' : '#ccc'}}>{isEvenRow ? <FaArrowRight/> : <FaArrowLeft/>}</div>)}
+                                {i < row.length - 1 && (<div style={{margin:'0 20px', fontSize:'24px', color: isCompleted ? '#28a745' : '#555'}}>{isEvenRow ? <FaArrowRight/> : <FaArrowLeft/>}</div>)}
                             </div>
                         );
                     })}
                 </div>
-                {!isLastRow && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed #ccc' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed #ccc', borderBottom: '4px dashed #ccc', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
+                {!isLastRow && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed #555' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed #555', borderBottom: '4px dashed #555', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
             </div>
           );
         })}
       </div>
 
       {/* Resources Section */}
-      <div style={{ background: '#f8f9fa', padding: '50px 20px', borderTop: '2px solid #ddd', minHeight: '500px' }}>
+      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '50px 20px', borderTop: '2px solid rgba(255,255,255,0.1)', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
-                    <h2 style={{ borderLeft: '6px solid #007bff', paddingLeft: '15px', margin:0 }}>
-                        📚 Resources: <span style={{color:'#007bff'}}>{selectedNode.label}</span>
+                    <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
+                        📚 Resources: <span style={{color:'#00d2ff'}}>{selectedNode.label}</span>
                     </h2>
-                    
                     {!completedNodes.has(selectedNode.label) && (
                         <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', boxShadow:'0 4px 6px rgba(0,0,0,0.1)'}}>
                             <FaGraduationCap size={24}/>
@@ -288,17 +231,17 @@ function RoadmapGraph() {
                 
                 {loadingResources ? <div className="spinner"></div> : (
                     <div style={{display:'flex', gap:'30px', flexWrap:'wrap'}}>
-                        <div style={{flex: 1, minWidth:'300px', background:'white', padding:'20px', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                            <h3 style={{borderBottom:'2px solid #ff0000', paddingBottom:'10px', marginTop:0}}><FaPlayCircle color="#ff0000"/> Videos</h3>
-                            <div style={{display:'grid', gap:'15px'}}>{resources.videos.map((v, i) => (<div key={i} style={{display:'flex', gap:'10px', alignItems:'center'}}><a href={v.url} target="_blank" rel="noreferrer" style={{display:'flex', gap:'10px', textDecoration:'none', color:'#333', width:'100%'}}><img src={v.thumbnail} style={{width:'80px', height:'60px', borderRadius:'5px', objectFit:'cover'}} /><div style={{flex:1}}><div style={{fontSize:'0.9rem', fontWeight:'bold', lineHeight:'1.2'}}>{v.title.slice(0, 50)}...</div><div style={{fontSize:'0.8rem', color:'#666'}}>{v.channel}</div></div></a><button onClick={() => handleSaveResource(v, 'video')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#007bff"/></button></div>))}</div>
+                        <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
+                            <h3 style={{borderBottom:'2px solid #ff6b6b', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaPlayCircle color="#ff6b6b"/> Videos</h3>
+                            <div style={{display:'grid', gap:'15px'}}>{resources.videos.map((v, i) => (<div key={i} style={{display:'flex', gap:'10px', alignItems:'center'}}><a href={v.url} target="_blank" rel="noreferrer" style={{display:'flex', gap:'10px', textDecoration:'none', color:'white', width:'100%'}}><img src={v.thumbnail} style={{width:'80px', height:'60px', borderRadius:'5px', objectFit:'cover'}} /><div style={{flex:1}}><div style={{fontSize:'0.9rem', fontWeight:'bold', lineHeight:'1.2'}}>{v.title.slice(0, 50)}...</div><div style={{fontSize:'0.8rem', color:'#aaa'}}>{v.channel}</div></div></a><button onClick={() => handleSaveResource(v, 'video')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
-                        <div style={{flex: 1, minWidth:'300px', background:'white', padding:'20px', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                             <h3 style={{borderBottom:'2px solid #28a745', paddingBottom:'10px', marginTop:0}}><FaGlobe color="#28a745"/> Articles</h3>
-                             <div style={{display:'grid', gap:'10px'}}>{resources.articles?.map((a, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={a.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'#333', display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'1.2rem'}}>📄</span><div style={{fontWeight:'bold', fontSize:'0.95rem'}}>{a.title}</div></a><button onClick={() => handleSaveResource(a, 'article')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#007bff"/></button></div>))}</div>
+                        <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
+                             <h3 style={{borderBottom:'2px solid #4caf50', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaGlobe color="#4caf50"/> Articles</h3>
+                             <div style={{display:'grid', gap:'10px'}}>{resources.articles?.map((a, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={a.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'1.2rem'}}>📄</span><div style={{fontWeight:'bold', fontSize:'0.95rem'}}>{a.title}</div></a><button onClick={() => handleSaveResource(a, 'article')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
-                        <div style={{flex: 1, minWidth:'300px', background:'white', padding:'20px', borderRadius:'10px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                             <h3 style={{borderBottom:'2px solid #ffc107', paddingBottom:'10px', marginTop:0}}><FaFilePdf color="#ffc107"/> Cheat Sheets</h3>
-                             <div style={{display:'grid', gap:'10px'}}>{resources.pdfs.map((p, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={p.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'#333', display:'flex', alignItems:'center', gap:'10px', flex:1}}><FaFilePdf color="#dc3545"/><span style={{fontSize:'0.9rem', fontWeight:'500'}}>{p.title}</span></a><button onClick={() => handleSaveResource(p, 'pdf')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#007bff"/></button></div>))}</div>
+                        <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
+                             <h3 style={{borderBottom:'2px solid #ffc107', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaFilePdf color="#ffc107"/> Cheat Sheets</h3>
+                             <div style={{display:'grid', gap:'10px'}}>{resources.pdfs.map((p, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={p.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><FaFilePdf color="#dc3545"/><span style={{fontSize:'0.9rem', fontWeight:'500'}}>{p.title}</span></a><button onClick={() => handleSaveResource(p, 'pdf')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
                     </div>
                 )}
