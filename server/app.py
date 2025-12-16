@@ -286,8 +286,6 @@ def save_resource():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ✅ CORRECT: Single definition for submit_progress
-
 
 @app.route('/api/submit_progress', methods=['POST'])
 def submit_progress():
@@ -393,16 +391,61 @@ def get_quiz():
     except:
         return jsonify([{"question": "Error generating quiz", "options": ["OK"], "correct_answer": 0}])
 
+# ✅ UPDATED: /api/resources now calculates Trust Score
+
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
-    topic = request.args.get('topic')
+    # 1. Get Params
+    # 'search_query' is what we send to YouTube/DuckDuckGo
+    search_query = request.args.get('search_query')
+
+    # 'topic_key' and 'node_label' are for DB lookups
+    topic_key = request.args.get('topic_key', '').strip().title()
+    node_label = request.args.get('node_label', '').strip()
     mode = request.args.get('mode', 'standard')
 
+    # Fallback for old format calls
+    if not search_query:
+        search_query = request.args.get('topic')
+
+    # 2. Calculate Trust Score (Sentiment)
+    trust_score = None
+    satisfaction_level = "Neutral"
+    review_count = 0
+
+    try:
+        # Fetch all progress records for this specific node
+        response = supabase.table('node_progress').select('sentiment_score').eq(
+            'topic', topic_key).eq('node_label', node_label).execute()
+
+        scores = [item['sentiment_score']
+                  for item in response.data if item['sentiment_score'] is not None]
+        review_count = len(scores)
+
+        if scores:
+            # TextBlob sentiment is -1.0 to 1.0. Convert to 0-100.
+            avg_raw = sum(scores) / len(scores)
+            trust_score = int(((avg_raw + 1) / 2) * 100)
+
+            if trust_score >= 80:
+                satisfaction_level = "High"
+            elif trust_score >= 50:
+                satisfaction_level = "Medium"
+            else:
+                satisfaction_level = "Low"
+
+    except Exception as e:
+        print(f"⚠️ Sentiment Calc Error: {e}")
+
+    # 3. Return Data
     return jsonify({
-        "videos": get_youtube_videos(topic, mode),
-        "articles": scrape_articles(topic, mode),
-        "pdfs": get_pdfs(topic, mode)
+        "videos": get_youtube_videos(search_query, mode),
+        "articles": scrape_articles(search_query, mode),
+        "pdfs": get_pdfs(search_query, mode),
+        "trust_score": trust_score,
+        "satisfaction_level": satisfaction_level,
+        "review_count": review_count
     })
 
 

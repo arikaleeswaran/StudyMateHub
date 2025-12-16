@@ -17,7 +17,7 @@ function RoadmapGraph() {
   
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [] });
+  const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); // ✅ Added trust_score
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [progress, setProgress] = useState(0);
 
@@ -105,13 +105,13 @@ function RoadmapGraph() {
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            await axios.post(`${baseUrl}/api/submit_progress`, {
+            await axios.post(`${baseUrl}/api/submit_progress`, { 
                 user_id: user.id, 
-                username: user.user_metadata?.full_name || user.email.split('@')[0], // ✅ SEND NAME
+                username: user.user_metadata?.full_name || user.email.split('@')[0],
                 topic: topic, 
                 node_label: checkNode.label, 
                 score: score, 
-                feedback: feedback
+                feedback: feedback 
             });
         } catch(e) { console.error(e); }
     }
@@ -125,15 +125,29 @@ function RoadmapGraph() {
     }
   };
 
+  // ✅ UPDATED: Send correct params for Trust Score
   const fetchResources = async (node) => {
     setSelectedNode(node);
-    setResources({ videos: [], articles: [], pdfs: [] }); 
+    setResources({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); 
     setLoadingResources(true);
+    
     const params = new URLSearchParams(location.search);
     const mode = params.get('mode') || 'standard';
+
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        const res = await axios.get(`${baseUrl}/api/resources?topic=${topic} ${node.label}&mode=${mode}`);
+        
+        // Construct params for backend
+        const searchQuery = `${topic} ${node.label}`;
+        
+        const res = await axios.get(`${baseUrl}/api/resources`, {
+            params: {
+                search_query: searchQuery,  // For YouTube/Google
+                topic_key: topic,           // For Supabase (Sentiment)
+                node_label: node.label,     // For Supabase (Sentiment)
+                mode: mode
+            }
+        });
         setResources(res.data);
     } catch(e) { console.error(e); } 
     finally { 
@@ -224,10 +238,34 @@ function RoadmapGraph() {
       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '50px 20px', borderTop: '2px solid rgba(255,255,255,0.1)', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
-                    <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
-                        📚 Resources: <span style={{color:'#00d2ff'}}>{selectedNode.label}</span>
-                    </h2>
+                
+                {/* ✅ UPDATED HEADER WITH TRUST BADGE */}
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', flexWrap:'wrap', gap:'15px'}}>
+                    
+                    <div style={{display:'flex', alignItems:'center', gap:'20px'}}>
+                        <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
+                            📚 Resources: <span style={{color:'#00d2ff'}}>{selectedNode.label}</span>
+                        </h2>
+
+                        {!loadingResources && resources.trust_score !== null && (
+                            <div style={{
+                                padding: '8px 16px',
+                                borderRadius: '30px',
+                                background: resources.trust_score >= 80 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)',
+                                border: resources.trust_score >= 80 ? '1px solid #28a745' : '1px solid #ffc107',
+                                color: resources.trust_score >= 80 ? '#28a745' : '#ffc107',
+                                fontWeight: 'bold',
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                fontSize: '0.9rem',
+                                animation: 'fadeIn 0.5s'
+                            }}>
+                                {resources.trust_score >= 80 ? '🔥' : '😐'} 
+                                {resources.trust_score}% Satisfaction 
+                                <span style={{fontSize:'0.8rem', opacity:0.8}}>({resources.review_count} reviews)</span>
+                            </div>
+                        )}
+                    </div>
+                    
                     {!completedNodes.has(selectedNode.label) && (
                         <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', boxShadow:'0 4px 6px rgba(0,0,0,0.1)'}}>
                             <FaGraduationCap size={24}/>

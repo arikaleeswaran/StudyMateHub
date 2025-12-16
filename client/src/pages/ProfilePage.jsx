@@ -182,6 +182,19 @@ function ProfilePage() {
              <div style={{ padding: '5px 15px', background: rank.color, color: 'white', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '5px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
                 <span style={{fontSize: '1.2rem'}}>{rank.icon}</span> {rank.title} (Lvl {Math.floor(totalScore / 10)})
              </div>
+             <div style={{ 
+                padding: '5px 15px', 
+                background: 'rgba(255, 193, 7, 0.1)', 
+                color: '#ffc107', 
+                border: '1px solid #ffc107',
+                borderRadius: '20px', 
+                fontWeight: 'bold', 
+                fontSize: '0.9rem', 
+                display: 'flex', alignItems: 'center', gap: '5px',
+                boxShadow: '0 0 10px rgba(255, 193, 7, 0.2)'
+            }}>
+            ⭐ {totalScore} Points
+            </div>
           </div>
           <p style={{ color: '#94a3b8', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
         </div>
