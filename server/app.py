@@ -391,8 +391,6 @@ def get_quiz():
     except:
         return jsonify([{"question": "Error generating quiz", "options": ["OK"], "correct_answer": 0}])
 
-# ✅ UPDATED: /api/resources now calculates Trust Score
-
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():

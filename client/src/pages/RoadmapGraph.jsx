@@ -125,7 +125,6 @@ function RoadmapGraph() {
     }
   };
 
-  // ✅ UPDATED: Send correct params for Trust Score
   const fetchResources = async (node) => {
     setSelectedNode(node);
     setResources({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); 
@@ -239,7 +238,7 @@ function RoadmapGraph() {
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                 
-                {/* ✅ UPDATED HEADER WITH TRUST BADGE */}
+                {/*UPDATED HEADER WITH TRUST BADGE */}
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', flexWrap:'wrap', gap:'15px'}}>
                     
                     <div style={{display:'flex', alignItems:'center', gap:'20px'}}>

@@ -5,13 +5,12 @@ import Navbar from '../components/Navbar';
 
 function HomePage() {
   const [topic, setTopic] = useState('');
-  const [isPanicMode, setIsPanicMode] = useState(false); // 🆕 Vibe State
+  const [isPanicMode, setIsPanicMode] = useState(false); // Vibe State
   const navigate = useNavigate();
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (topic.trim()) {
-      // 🆕 Pass mode as a query parameter
       const mode = isPanicMode ? 'panic' : 'standard';
       navigate(`/roadmap/${topic}?mode=${mode}`);
     }
@@ -59,7 +58,7 @@ function HomePage() {
           </button>
         </form>
 
-        {/* --- 🆕 VIBE CHECK SWITCH --- */}
+        {/* VIBE CHECK SWITCH --- */}
         <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
             <span style={{ color: isPanicMode ? '#64748b' : '#00d2ff', fontWeight: 'bold' }}>🌱 Just Curious</span>
             
@@ -104,8 +103,6 @@ function HomePage() {
   );
 }
 
-// ... (Keep existing styles) ...
-// Add styles if you changed them, otherwise reuse the previous styles object.
 const styles = {
   container: {
     width: '100vw',
