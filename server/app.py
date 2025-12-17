@@ -66,7 +66,8 @@ def parse_json_safely(text, expected_type="dict"):
 
 def get_smart_search_term(long_text):
     try:
-        prompt = f"Extract the core technical topic from this text into a 3-5 word search query. Return ONLY the raw string, no quotes: '{long_text}'"
+        # ✅ Enforce English in extraction
+        prompt = f"Extract the core technical topic from this text into a 3-5 word English search query. Return ONLY the raw string, no quotes: '{long_text}'"
         completion = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
@@ -91,7 +92,7 @@ def get_youtube_videos(topic, mode='standard', max_results=5):
     try:
         search_request = youtube_client.search().list(
             q=query, part='snippet', type='video',
-            maxResults=15, relevanceLanguage='en', videoCategoryId='27'
+            maxResults=15, relevanceLanguage='en', videoCategoryId='27'  # ✅ Already has 'en'
         )
         search_response = search_request.execute()
         video_ids = [item['id']['videoId']
@@ -130,7 +131,10 @@ def scrape_articles(topic, mode='standard', max_results=4):
     smart_topic = get_smart_search_term(topic)
 
     suffix = "cheat sheet summary" if mode == 'panic' else "tutorial geeksforgeeks w3schools"
-    url = f"https://html.duckduckgo.com/html/?q={smart_topic} {suffix}"
+
+    # ✅ FIX: Added '&kl=us-en' to force English results
+    url = f"https://html.duckduckgo.com/html/?q={smart_topic} {suffix}&kl=us-en"
+
     headers = {'User-Agent': 'Mozilla/5.0'}
     articles = []
 
@@ -183,7 +187,9 @@ def get_pdfs(topic, mode='standard', max_results=4):
         if len(pdfs) >= 3:
             break
         try:
-            url = f"https://html.duckduckgo.com/html/?q={query}"
+            # ✅ FIX: Added '&kl=us-en' to force English results
+            url = f"https://html.duckduckgo.com/html/?q={query}&kl=us-en"
+
             response = requests.get(url, headers=headers, timeout=5)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'html.parser')
@@ -297,7 +303,6 @@ def submit_progress():
 
     blob = TextBlob(feedback)
     try:
-        # 1. Save detailed progress
         supabase.table('node_progress').insert({
             "user_id": user_id,
             "topic": data.get('topic', 'General').strip().title(),
@@ -307,7 +312,6 @@ def submit_progress():
             "sentiment_score": blob.sentiment.polarity
         }).execute()
 
-        # 2. Update Leaderboard (Fail-safe)
         try:
             existing = supabase.table('leaderboard').select(
                 '*').eq('user_id', user_id).execute()
@@ -350,17 +354,18 @@ def get_roadmap():
         except:
             pass
 
+    # ✅ FIX: Enforce English instructions for the roadmap itself
     if mode == 'panic':
         prompt = f"""
         The user has an EXAM TOMORROW on '{topic}'. 
-        Create a customized 'Crash Course' learning path with exactly 4 steps.
+        Create a customized 'Crash Course' learning path in English with exactly 4 steps.
         Focus ONLY on the high-yield, most critical concepts that appear in exams.
         Skip the history/intro. Go straight to the hard/important stuff.
         Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Core Concept 1"}}, ... ] }}
         """
     else:
         prompt = f"""
-        Create a comprehensive, linear 7-step learning path for '{topic}'.
+        Create a comprehensive, linear 7-step learning path for '{topic}' in English.
         Start from basics and progress to advanced.
         Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}
         """
@@ -378,7 +383,8 @@ def get_roadmap():
 def get_quiz():
     main, sub, num = request.args.get('main_topic'), request.args.get(
         'sub_topic'), request.args.get('num', '10')
-    prompt = f"""Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}). JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
+    # ✅ FIX: Enforce English for Quizzes
+    prompt = f"""Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}) in English. JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
     try:
         completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
                                                          {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
@@ -394,35 +400,26 @@ def get_quiz():
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
-    # 1. Get Params
-    # 'search_query' is what we send to YouTube/DuckDuckGo
     search_query = request.args.get('search_query')
-
-    # 'topic_key' and 'node_label' are for DB lookups
     topic_key = request.args.get('topic_key', '').strip().title()
     node_label = request.args.get('node_label', '').strip()
     mode = request.args.get('mode', 'standard')
 
-    # Fallback for old format calls
     if not search_query:
         search_query = request.args.get('topic')
 
-    # 2. Calculate Trust Score (Sentiment)
     trust_score = None
     satisfaction_level = "Neutral"
     review_count = 0
 
     try:
-        # Fetch all progress records for this specific node
         response = supabase.table('node_progress').select('sentiment_score').eq(
             'topic', topic_key).eq('node_label', node_label).execute()
-
         scores = [item['sentiment_score']
                   for item in response.data if item['sentiment_score'] is not None]
         review_count = len(scores)
 
         if scores:
-            # TextBlob sentiment is -1.0 to 1.0. Convert to 0-100.
             avg_raw = sum(scores) / len(scores)
             trust_score = int(((avg_raw + 1) / 2) * 100)
 
@@ -436,7 +433,6 @@ def get_resources():
     except Exception as e:
         print(f"⚠️ Sentiment Calc Error: {e}")
 
-    # 3. Return Data
     return jsonify({
         "videos": get_youtube_videos(search_query, mode),
         "articles": scrape_articles(search_query, mode),
