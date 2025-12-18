@@ -66,7 +66,7 @@ def parse_json_safely(text, expected_type="dict"):
 
 def get_smart_search_term(long_text):
     try:
-        # ✅ Enforce English in extraction
+        # Enforce English in extraction
         prompt = f"Extract the core technical topic from this text into a 3-5 word English search query. Return ONLY the raw string, no quotes: '{long_text}'"
         completion = groq_client.chat.completions.create(
             model=GROQ_MODEL,
@@ -132,7 +132,7 @@ def scrape_articles(topic, mode='standard', max_results=4):
 
     suffix = "cheat sheet summary" if mode == 'panic' else "tutorial geeksforgeeks w3schools"
 
-    # ✅ FIX: Added '&kl=us-en' to force English results
+    # FIX: Added '&kl=us-en' to force English results
     url = f"https://html.duckduckgo.com/html/?q={smart_topic} {suffix}&kl=us-en"
 
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -187,7 +187,7 @@ def get_pdfs(topic, mode='standard', max_results=4):
         if len(pdfs) >= 3:
             break
         try:
-            # ✅ FIX: Added '&kl=us-en' to force English results
+            # FIX: Added '&kl=us-en' to force English results
             url = f"https://html.duckduckgo.com/html/?q={query}&kl=us-en"
 
             response = requests.get(url, headers=headers, timeout=5)
@@ -354,7 +354,7 @@ def get_roadmap():
         except:
             pass
 
-    # ✅ FIX: Enforce English instructions for the roadmap itself
+    # FIX: Enforce English instructions for the roadmap itself
     if mode == 'panic':
         prompt = f"""
         The user has an EXAM TOMORROW on '{topic}'. 
@@ -383,7 +383,7 @@ def get_roadmap():
 def get_quiz():
     main, sub, num = request.args.get('main_topic'), request.args.get(
         'sub_topic'), request.args.get('num', '10')
-    # ✅ FIX: Enforce English for Quizzes
+    # FIX: Enforce English for Quizzes
     prompt = f"""Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}) in English. JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
     try:
         completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[

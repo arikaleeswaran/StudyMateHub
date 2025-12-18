@@ -17,7 +17,7 @@ function RoadmapGraph() {
   
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); // ✅ Added trust_score
+  const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); //Added trust_score
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [progress, setProgress] = useState(0);
 
