@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { FaBrain, FaUserCircle, FaSignOutAlt,FaTrophy } from 'react-icons/fa';
+import { FaBrain, FaUserCircle, FaSignOutAlt,FaTrophy,FaUserShield } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
@@ -21,6 +21,9 @@ function Navbar() {
       <div style={{display:'flex', gap:'15px', alignItems: 'center'}}>
         {user ? (
             <>
+                <button onClick={() => navigate('/admin')} style={styles.navButton} title="Admin Panel">
+                  <FaUserShield size={18} color="#ff4444" />
+              </button>
                 <button onClick={() => navigate('/profile')} style={styles.navButton}>
                     <FaUserCircle size={18} /> Dashboard
                 </button>

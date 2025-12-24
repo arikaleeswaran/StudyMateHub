@@ -6,6 +6,7 @@ import RoadmapGraph from './pages/RoadmapGraph';
 import AuthPage from './pages/AuthPage';
 import ProfilePage from './pages/ProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import AdminPage from './pages/AdminPage';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/roadmap/:topic" element={<RoadmapGraph />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
