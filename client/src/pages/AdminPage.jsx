@@ -1,14 +1,26 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { FaUsers, FaMapMarkedAlt, FaSmile, FaTrash, FaExclamationCircle } from 'react-icons/fa';
+import { FaUsers, FaMapMarkedAlt, FaSmile, FaTrash } from 'react-icons/fa';
 
 function AdminPage() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ users: 0, roadmaps: 0, satisfaction: 0 });
   const [roadmaps, setRoadmaps] = useState([]);
   const [feedbacks, setFeedbacks] = useState([]);
+  const [students, setStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+      const isAdmin = localStorage.getItem('admin_auth');
+      if (!isAdmin) {
+          navigate('/admin/login'); 
+      } else {
+          fetchAllData();
+      }
+  }, []);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -23,11 +35,13 @@ function AdminPage() {
 
         const feedRes = await axios.get(`${baseUrl}/api/admin/feedback`);
         setFeedbacks(feedRes.data);
+
+        const usersRes = await axios.get(`${baseUrl}/api/admin/users`);
+        setStudents(usersRes.data);
+
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
-
-  useEffect(() => { fetchAllData(); }, []);
 
   const handleDeleteRoadmap = async (topic) => {
       if(!confirm("⚠️ Admin Action: Permanently delete this roadmap?")) return;
@@ -35,7 +49,7 @@ function AdminPage() {
           const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
           await axios.delete(`${baseUrl}/api/admin/delete_roadmap?topic=${topic}`);
           alert("Deleted.");
-          fetchAllData(); // Refresh
+          fetchAllData(); 
       } catch(e) { alert("Failed to delete"); }
   };
 
@@ -45,7 +59,7 @@ function AdminPage() {
 
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px', width: '100%' }}>
         <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>⚡ Admin Command Center</h1>
-        <p style={{ color: '#aaa', marginBottom: '40px' }}>Monitor platform health and moderate content.</p>
+        <p style={{ color: '#aaa', marginBottom: '40px' }}>Monitor platform health, student marks, and content.</p>
 
         {/* --- STATS WIDGETS --- */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
@@ -66,12 +80,14 @@ function AdminPage() {
         {/* --- TABS --- */}
         <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
             <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, borderBottom: activeTab === 'dashboard' ? '3px solid #00d2ff' : 'none', color: activeTab==='dashboard'?'#00d2ff':'#aaa'}}>Recent Roadmaps</button>
+            <button onClick={() => setActiveTab('students')} style={{...styles.tab, borderBottom: activeTab === 'students' ? '3px solid #00d2ff' : 'none', color: activeTab==='students'?'#00d2ff':'#aaa'}}>Student Marks</button>
             <button onClick={() => setActiveTab('feedback')} style={{...styles.tab, borderBottom: activeTab === 'feedback' ? '3px solid #00d2ff' : 'none', color: activeTab==='feedback'?'#00d2ff':'#aaa'}}>User Feedback</button>
         </div>
 
         {/* --- CONTENT AREA --- */}
         {loading ? <div className="spinner"></div> : (
             <>
+                {/* 1. ROADMAPS TAB */}
                 {activeTab === 'dashboard' && (
                     <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                         {roadmaps.map((map, i) => (
@@ -87,6 +103,31 @@ function AdminPage() {
                     </div>
                 )}
 
+                {/* 2. STUDENT MARKS TAB */}
+                {activeTab === 'students' && (
+                    <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                        {students.map((student, i) => (
+                            <div key={i} style={styles.listItem}>
+                                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                                    <div style={{width:'40px', height:'40px', background:'#e3f2fd', color:'#007bff', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', fontWeight:'bold'}}>
+                                        {i + 1}
+                                    </div>
+                                    <div>
+                                        <h4 style={{margin:'0 0 5px 0'}}>{student.full_name || "Anonymous Scholar"}</h4>
+                                        <span style={{fontSize:'0.8rem', color:'#aaa'}}>User ID: {student.user_id.slice(0, 8)}...</span>
+                                    </div>
+                                </div>
+                                <div style={{textAlign:'right'}}>
+                                    <h3 style={{margin:0, color:'#ffc107'}}>{student.score} pts</h3>
+                                    <span style={{fontSize:'0.8rem', color:'#666'}}>Total Marks</span>
+                                </div>
+                            </div>
+                        ))}
+                        {students.length === 0 && <p style={{color:'#666'}}>No students registered yet.</p>}
+                    </div>
+                )}
+
+                {/* 3. FEEDBACK TAB */}
                 {activeTab === 'feedback' && (
                     <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'20px'}}>
                         {feedbacks.map((item, i) => (

@@ -1,87 +1,38 @@
-import { useNavigate } from 'react-router-dom';
-import { FaBrain, FaUserCircle, FaSignOutAlt,FaTrophy,FaUserShield } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { FaUserCircle, FaTrophy, FaUserShield } from 'react-icons/fa';
 
 function Navbar() {
-  const navigate = useNavigate();
   const { user, signOut } = useAuth();
-
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/');
-  };
+  const navigate = useNavigate();
 
   return (
-    <nav style={styles.navbar}>
-      <div style={styles.logo} onClick={() => navigate('/')}>
-          <FaBrain style={{ color: '#00d2ff', fontSize: '1.5rem' }} />
-          <span style={styles.logoText}>StudyMateHub</span>
-      </div>
+    <div style={styles.nav}>
+      <div onClick={() => navigate('/')} style={styles.logo}>StudyMateHub</div>
       
-      <div style={{display:'flex', gap:'15px', alignItems: 'center'}}>
+      <div style={styles.links}>
         {user ? (
-            <>
-                <button onClick={() => navigate('/admin')} style={styles.navButton} title="Admin Panel">
-                  <FaUserShield size={18} color="#ff4444" />
-              </button>
-                <button onClick={() => navigate('/profile')} style={styles.navButton}>
-                    <FaUserCircle size={18} /> Dashboard
-                </button>
-                <button onClick={() => navigate('/leaderboard')} style={styles.navButton}>
-                    <FaTrophy size={18} color="#FFD700" /> Leaderboard
-                </button>
-                <button onClick={handleLogout} style={{...styles.navButton, background:'rgba(220, 53, 69, 0.2)', borderColor:'rgba(220, 53, 69, 0.3)', color: '#ff6b6b'}}>
-                    <FaSignOutAlt />
-                </button>
-            </>
+          <>
+            <button onClick={() => navigate('/leaderboard')} style={styles.navButton}><FaTrophy size={18} color="#FFD700" /> Leaderboard</button>
+            <button onClick={() => navigate('/profile')} style={styles.navButton}><FaUserCircle size={18} /> Dashboard</button>
+            <button onClick={() => navigate('/admin/login')} style={styles.navButton} title="Admin Panel"><FaUserShield size={18} color="#ff4444" /></button>
+            <button onClick={() => signOut()} style={styles.logoutBtn}>Logout</button>
+          </>
         ) : (
-            <button onClick={() => navigate('/auth')} style={styles.navButton}>
-                Login
-            </button>
+          <button onClick={() => navigate('/auth')} style={styles.loginBtn}>Login</button>
         )}
       </div>
-    </nav>
+    </div>
   );
 }
 
 const styles = {
-  navbar: {
-    width: '100%',
-    padding: '15px 40px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: '#1e293b', // Matches the Homepage Dark Theme
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-    color: 'white',
-    boxSizing: 'border-box'
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    cursor: 'pointer'
-  },
-  logoText: {
-    fontWeight: 'bold', 
-    fontSize: '1.2rem', 
-    background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', 
-    WebkitBackgroundClip: 'text', 
-    WebkitTextFillColor: 'transparent'
-  },
-  navButton: {
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    padding: '8px 15px',
-    borderRadius: '20px',
-    color: 'white',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'all 0.3s ease',
-    fontSize: '0.9rem'
-  }
+  nav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 30px', background: 'rgba(30, 41, 59, 0.8)', backdropFilter: 'blur(10px)', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' },
+  logo: { fontSize: '1.5rem', fontWeight: 'bold', cursor: 'pointer', background: 'linear-gradient(90deg, #00c6ff, #0072ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
+  links: { display: 'flex', gap: '20px', alignItems: 'center' },
+  navButton: { background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' },
+  loginBtn: { padding: '8px 20px', borderRadius: '20px', border: 'none', background: '#007bff', color: 'white', cursor: 'pointer', fontWeight: 'bold' },
+  logoutBtn: { background: 'none', border: '1px solid #dc3545', color: '#dc3545', padding: '5px 15px', borderRadius: '15px', cursor: 'pointer' }
 };
 
 export default Navbar;

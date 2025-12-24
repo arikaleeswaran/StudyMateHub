@@ -80,28 +80,39 @@ def get_smart_search_term(long_text):
 
 def get_youtube_videos(topic, mode='standard', max_results=5):
     search_term = get_smart_search_term(topic)
-    query = f"{search_term} crash course in 10 minutes" if mode == 'panic' else f"{search_term} tutorial"
+
+    if mode == 'panic':
+        query = f"{search_term} crash course in 10 minutes"
+    else:
+        query = f"{search_term} tutorial"
 
     if not youtube_client:
         return []
     try:
-        search_request = youtube_client.search().list(q=query, part='snippet', type='video',
-                                                      maxResults=15, relevanceLanguage='en', videoCategoryId='27')
+        search_request = youtube_client.search().list(
+            q=query, part='snippet', type='video',
+            maxResults=15, relevanceLanguage='en', videoCategoryId='27'
+        )
         search_response = search_request.execute()
         video_ids = [item['id']['videoId']
                      for item in search_response.get('items', [])]
+
         if not video_ids:
             return []
 
         video_details = youtube_client.videos().list(
-            part='snippet,contentDetails', id=','.join(video_ids)).execute()
+            part='snippet,contentDetails', id=','.join(video_ids)
+        ).execute()
         videos = []
+
         for item in video_details.get('items', []):
             if len(videos) >= max_results:
                 break
             duration_str = item['contentDetails']['duration']
+
             if mode == 'panic' and "H" in duration_str:
                 continue
+
             if "M" in duration_str:
                 videos.append({
                     "title": item['snippet']['title'],
@@ -121,6 +132,7 @@ def scrape_articles(topic, mode='standard', max_results=4):
     url = f"https://html.duckduckgo.com/html/?q={smart_topic} {suffix}&kl=us-en"
     headers = {'User-Agent': 'Mozilla/5.0'}
     articles = []
+
     try:
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
@@ -129,19 +141,33 @@ def scrape_articles(topic, mode='standard', max_results=4):
                 title = item.find('a', class_='result__a')
                 snippet = item.find('a', class_='result__snippet')
                 if title and snippet:
-                    articles.append(
-                        {"title": title.text, "url": title['href'], "snippet": snippet.text, "type": "article"})
+                    articles.append({
+                        "title": title.text, "url": title['href'],
+                        "snippet": snippet.text, "type": "article"
+                    })
     except:
         pass
 
     if not articles:
         safe_topic = urllib.parse.quote(smart_topic)
         if mode == 'panic':
-            articles = [{"title": f"⚡ Quick Ref: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+quick+reference", "type": "article", "snippet": "Fast facts."},
-                        {"title": f"📝 Exam Notes: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+exam+notes", "type": "article", "snippet": "Revision notes."}]
+            articles = [
+                {"title": f"⚡ Quick Ref: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+quick+reference",
+                    "type": "article", "snippet": "Fast facts."},
+                {"title": f"📝 Exam Notes: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+exam+notes",
+                 "type": "article", "snippet": "Revision notes."},
+            ]
         else:
-            articles = [{"title": f"GeeksforGeeks: {smart_topic}", "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}", "type": "article", "snippet": "Click to search."}, {
-                "title": f"W3Schools: Learn {smart_topic}", "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}", "type": "article", "snippet": "Beginner guides."}]
+            articles = [
+                {"title": f"GeeksforGeeks: {smart_topic}", "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}",
+                    "type": "article", "snippet": "Click to search."},
+                {"title": f"W3Schools: Learn {smart_topic}", "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}",
+                 "type": "article", "snippet": "Beginner guides."},
+                {"title": f"Medium: Articles on {smart_topic}", "url": f"https://medium.com/search?q={safe_topic}",
+                 "type": "article", "snippet": "Community insights."},
+                {"title": f"Dev.to: Guides for {smart_topic}", "url": f"https://dev.to/search?q={safe_topic}",
+                 "type": "article", "snippet": "Practical tutorials."}
+            ]
     return articles
 
 
@@ -151,6 +177,7 @@ def get_pdfs(topic, mode='standard', max_results=4):
     headers = {'User-Agent': 'Mozilla/5.0'}
     search_queries = [f"{smart_topic} cheat sheet filetype:pdf",
                       f"{smart_topic} lecture notes filetype:pdf"]
+
     for query in search_queries:
         if len(pdfs) >= 3:
             break
@@ -172,15 +199,34 @@ def get_pdfs(topic, mode='standard', max_results=4):
 
     safe_topic = urllib.parse.quote(smart_topic)
     if len(pdfs) < 4:
-        smart_links = [{"title": f"🔍 {smart_topic} Cheat Sheet", "url": f"https://www.google.com/search?q={safe_topic}+cheat+sheet+filetype:pdf", "type": "PDF"}, {"title": f"🎓 {smart_topic} Lecture Notes",
-                                                                                                                                                                   "url": f"https://www.google.com/search?q={safe_topic}+lecture+notes+filetype:pdf", "type": "PDF"}, {"title": f"📝 {smart_topic} Interview Qs", "url": f"https://www.google.com/search?q={safe_topic}+interview+questions+filetype:pdf", "type": "PDF"}]
+        smart_links = [
+            {"title": f"🔍 {smart_topic} Cheat Sheet",
+                "url": f"https://www.google.com/search?q={safe_topic}+cheat+sheet+filetype:pdf", "type": "PDF"},
+            {"title": f"🎓 {smart_topic} Lecture Notes",
+                "url": f"https://www.google.com/search?q={safe_topic}+lecture+notes+filetype:pdf", "type": "PDF"},
+            {"title": f"📝 {smart_topic} Interview Qs",
+                "url": f"https://www.google.com/search?q={safe_topic}+interview+questions+filetype:pdf", "type": "PDF"}
+        ]
         for link in smart_links:
             if len(pdfs) >= max_results:
                 break
             pdfs.append(link)
     return pdfs
 
-# --- STANDARD API ROUTES ---
+# --- API ROUTES ---
+
+
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@studymate.com")
+    admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
+    if email == admin_email and password == admin_pass:
+        return jsonify({"success": True, "message": "Welcome, Admin!"})
+    else:
+        return jsonify({"success": False, "error": "Invalid credentials"}), 401
 
 
 @app.route('/api/recommendations', methods=['GET'])
@@ -206,10 +252,18 @@ def get_recommendations():
                         recs[item['url']]['count'] += 1
             sorted_recs = sorted(
                 recs.values(), key=lambda x: x['count'], reverse=True)[:6]
+
         if not sorted_recs:
-            return jsonify([{"title": "🔥 Popular: Python Roadmap", "url": "https://roadmap.sh/python", "resource_type": "article", "topic": "Python", "count": 150}, {"title": "🎥 Watch: Machine Learning Basics", "url": "https://www.youtube.com/watch?v=GwIo3gDZCVQ", "resource_type": "video", "topic": "Machine Learning", "count": 120}, {"title": "📄 PDF: System Design Cheat Sheet", "url": "https://github.com/donnemartin/system-design-primer", "resource_type": "article", "topic": "System Design", "count": 95}])
+            return jsonify([
+                {"title": "🔥 Popular: Python Roadmap", "url": "https://roadmap.sh/python",
+                    "resource_type": "article", "topic": "Python", "count": 150},
+                {"title": "🎥 Watch: Machine Learning Basics", "url": "https://www.youtube.com/watch?v=GwIo3gDZCVQ",
+                    "resource_type": "video", "topic": "Machine Learning", "count": 120},
+                {"title": "📄 PDF: System Design Cheat Sheet", "url": "https://github.com/donnemartin/system-design-primer",
+                    "resource_type": "article", "topic": "System Design", "count": 95}
+            ])
         return jsonify(sorted_recs)
-    except:
+    except Exception as e:
         return jsonify([])
 
 
@@ -217,8 +271,11 @@ def get_recommendations():
 def save_roadmap():
     data = request.json
     try:
-        supabase.table('user_roadmaps').upsert({"user_id": data.get('user_id'), "topic": data.get(
-            'topic', '').strip().title(), "graph_data": data.get('graph_data')}).execute()
+        supabase.table('user_roadmaps').upsert({
+            "user_id": data.get('user_id'),
+            "topic": data.get('topic', '').strip().title(),
+            "graph_data": data.get('graph_data')
+        }).execute()
         return jsonify({"message": "Saved"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -228,7 +285,15 @@ def save_roadmap():
 def save_resource():
     data = request.json
     try:
-        supabase.table('saved_resources').insert(data).execute()
+        supabase.table('saved_resources').insert({
+            "user_id": data.get('user_id'),
+            "roadmap_topic": data.get('roadmap_topic').strip().title(),
+            "node_label": data.get('node_label'),
+            "resource_type": data.get('resource_type'),
+            "title": data.get('title'),
+            "url": data.get('url'),
+            "thumbnail": data.get('thumbnail', '')
+        }).execute()
         return jsonify({"message": "Saved"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -241,10 +306,18 @@ def submit_progress():
     user_id = data.get('user_id')
     username = data.get('username', 'Anonymous')
     score = data.get('score', 0)
+
     blob = TextBlob(feedback)
     try:
-        supabase.table('node_progress').insert({"user_id": user_id, "topic": data.get('topic', 'General').strip().title(), "node_label": data.get(
-            'node_label'), "quiz_score": score, "feedback_text": feedback, "sentiment_score": blob.sentiment.polarity}).execute()
+        supabase.table('node_progress').insert({
+            "user_id": user_id,
+            "topic": data.get('topic', 'General').strip().title(),
+            "node_label": data.get('node_label'),
+            "quiz_score": score,
+            "feedback_text": feedback,
+            "sentiment_score": blob.sentiment.polarity
+        }).execute()
+
         try:
             existing = supabase.table('leaderboard').select(
                 '*').eq('user_id', user_id).execute()
@@ -255,8 +328,9 @@ def submit_progress():
             else:
                 supabase.table('leaderboard').insert(
                     {"user_id": user_id, "full_name": username, "score": score}).execute()
-        except:
-            pass
+        except Exception as lb_error:
+            print(f"Leaderboard Error: {lb_error}")
+
         return jsonify({"message": "Saved"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -268,7 +342,7 @@ def get_leaderboard():
         response = supabase.table('leaderboard').select(
             '*').order('score', desc=True).limit(10).execute()
         return jsonify(response.data)
-    except:
+    except Exception as e:
         return jsonify([])
 
 
@@ -276,6 +350,7 @@ def get_leaderboard():
 def get_roadmap():
     topic = request.args.get('topic', '').strip().title()
     mode = request.args.get('mode', 'standard')
+
     if mode == 'standard':
         try:
             existing = supabase.table('user_roadmaps').select(
@@ -285,7 +360,21 @@ def get_roadmap():
         except:
             pass
 
-    prompt = f"The user has an EXAM TOMORROW on '{topic}'. Create a customized 'Crash Course' learning path in English with exactly 4 steps. Focus ONLY on the high-yield, most critical concepts. Return strict JSON: {{ \"nodes\": [ {{\"id\": \"1\", \"label\": \"Core Concept 1\"}}, ... ] }}" if mode == 'panic' else f"Create a comprehensive, linear 7-step learning path for '{topic}' in English. Start from basics and progress to advanced. Return strict JSON: {{ \"nodes\": [ {{\"id\": \"1\", \"label\": \"Basics\"}}, ... ] }}"
+    if mode == 'panic':
+        prompt = f"""
+        The user has an EXAM TOMORROW on '{topic}'. 
+        Create a customized 'Crash Course' learning path in English with exactly 4 steps.
+        Focus ONLY on the high-yield, most critical concepts that appear in exams.
+        Skip the history/intro. Go straight to the hard/important stuff.
+        Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Core Concept 1"}}, ... ] }}
+        """
+    else:
+        prompt = f"""
+        Create a comprehensive, linear 7-step learning path for '{topic}' in English.
+        Start from basics and progress to advanced.
+        Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}
+        """
+
     try:
         completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
                                                          {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
@@ -299,7 +388,7 @@ def get_roadmap():
 def get_quiz():
     main, sub, num = request.args.get('main_topic'), request.args.get(
         'sub_topic'), request.args.get('num', '10')
-    prompt = f"Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}) in English. JSON Array: [{{ \"question\": \"...\", \"options\": [\"A\",\"B\",\"C\",\"D\"], \"correct_answer\": 0 }}]"
+    prompt = f"""Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}) in English. JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
     try:
         completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
                                                          {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
@@ -315,28 +404,46 @@ def get_quiz():
 
 @app.route('/api/resources', methods=['GET'])
 def get_resources():
-    search_query = request.args.get(
-        'search_query') or request.args.get('topic')
+    search_query = request.args.get('search_query')
     topic_key = request.args.get('topic_key', '').strip().title()
     node_label = request.args.get('node_label', '').strip()
     mode = request.args.get('mode', 'standard')
-    trust_score, satisfaction_level, review_count = None, "Neutral", 0
+
+    if not search_query:
+        search_query = request.args.get('topic')
+
+    trust_score = None
+    satisfaction_level = "Neutral"
+    review_count = 0
+
     try:
         response = supabase.table('node_progress').select('sentiment_score').eq(
             'topic', topic_key).eq('node_label', node_label).execute()
         scores = [item['sentiment_score']
                   for item in response.data if item['sentiment_score'] is not None]
         review_count = len(scores)
+
         if scores:
-            trust_score = int(((sum(scores)/len(scores) + 1) / 2) * 100)
-            satisfaction_level = "High" if trust_score >= 80 else "Medium" if trust_score >= 50 else "Low"
-    except:
-        pass
+            avg_raw = sum(scores) / len(scores)
+            trust_score = int(((avg_raw + 1) / 2) * 100)
+
+            if trust_score >= 80:
+                satisfaction_level = "High"
+            elif trust_score >= 50:
+                satisfaction_level = "Medium"
+            else:
+                satisfaction_level = "Low"
+
+    except Exception as e:
+        print(f"⚠️ Sentiment Calc Error: {e}")
+
     return jsonify({
         "videos": get_youtube_videos(search_query, mode),
         "articles": scrape_articles(search_query, mode),
         "pdfs": get_pdfs(search_query, mode),
-        "trust_score": trust_score, "satisfaction_level": satisfaction_level, "review_count": review_count
+        "trust_score": trust_score,
+        "satisfaction_level": satisfaction_level,
+        "review_count": review_count
     })
 
 
@@ -359,31 +466,25 @@ def delete_resource():
     except:
         return jsonify({"error": "Failed"}), 500
 
-# --- 🚀 NEW: ADMIN ROUTES ---
+# --- ADMIN ROUTES ---
 
 
 @app.route('/api/admin/stats', methods=['GET'])
 def get_admin_stats():
     try:
-        # Count Users
         users = supabase.table('leaderboard').select(
             '*', count='exact').execute()
         total_users = users.count if users.count else len(users.data)
-
-        # Count Roadmaps
         roadmaps = supabase.table('user_roadmaps').select(
             '*', count='exact').execute()
         total_roadmaps = roadmaps.count if roadmaps.count else len(
             roadmaps.data)
-
-        # Avg Satisfaction
         feedback = supabase.table('node_progress').select(
             'sentiment_score').execute()
         scores = [f['sentiment_score']
                   for f in feedback.data if f['sentiment_score']]
         avg_satisfaction = int(
             ((sum(scores)/len(scores) + 1)/2)*100) if scores else 0
-
         return jsonify({"users": total_users, "roadmaps": total_roadmaps, "satisfaction": avg_satisfaction})
     except:
         return jsonify({"users": 0, "roadmaps": 0, "satisfaction": 0})
@@ -392,7 +493,6 @@ def get_admin_stats():
 @app.route('/api/admin/roadmaps', methods=['GET'])
 def get_admin_roadmaps():
     try:
-        # Fetch latest 20 roadmaps
         res = supabase.table('user_roadmaps').select(
             '*').order('created_at', desc=True).limit(20).execute()
         return jsonify(res.data)
@@ -403,9 +503,18 @@ def get_admin_roadmaps():
 @app.route('/api/admin/feedback', methods=['GET'])
 def get_admin_feedback():
     try:
-        # Fetch latest 20 feedbacks
         res = supabase.table('node_progress').select(
             '*').neq('feedback_text', '').order('created_at', desc=True).limit(20).execute()
+        return jsonify(res.data)
+    except:
+        return jsonify([])
+
+
+@app.route('/api/admin/users', methods=['GET'])
+def get_admin_users():
+    try:
+        res = supabase.table('leaderboard').select(
+            '*').order('score', desc=True).execute()
         return jsonify(res.data)
     except:
         return jsonify([])
@@ -414,7 +523,6 @@ def get_admin_feedback():
 @app.route('/api/admin/delete_roadmap', methods=['DELETE'])
 def admin_delete_roadmap():
     try:
-        # Admin delete (ignores user_id check)
         supabase.table('user_roadmaps').delete().eq(
             'topic', request.args.get('topic')).execute()
         return jsonify({"message": "Deleted by Admin"})
