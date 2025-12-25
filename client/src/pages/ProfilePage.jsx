@@ -7,10 +7,12 @@ import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChev
 import AssessmentModal from '../components/AssessmentModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Navbar from '../components/Navbar'; 
+import useMobile from '../hooks/useMobile';
 
 function ProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useMobile(); // ✅ Hook
   
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Scholar";
 
@@ -22,7 +24,7 @@ function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState([]);
 
-  // Modal States
+  // ... (Keep existing state and functions logic exactly the same) ...
   const [showQuiz, setShowQuiz] = useState(false);
   const [activeQuizData, setActiveQuizData] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null, title: '' });
@@ -105,9 +107,9 @@ function ProfilePage() {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/submit_progress`, {
             user_id: user.id, 
-            username: user.user_metadata?.full_name || user.email.split('@')[0], // ✅ SEND NAME
-            topic: topic, 
-            node_label: checkNode.label, 
+            username: user.user_metadata?.full_name || user.email.split('@')[0], 
+            topic: activeQuizData.mainTopic, 
+            node_label: activeQuizData.subTopic, 
             score: score, 
             feedback: feedback
         });
@@ -167,7 +169,7 @@ function ProfilePage() {
         <Navbar />
       </div>
 
-      <div style={{ padding: '40px', maxWidth: '1000px', width: '100%', margin: '0 auto', fontFamily: 'Segoe UI', flex: 1 }}>
+      <div style={{ padding: isMobile ? '20px' : '40px', maxWidth: '1000px', width: '100%', margin: '0 auto', fontFamily: 'Segoe UI', flex: 1 }}>
         
         {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '30px' }}>
@@ -175,33 +177,25 @@ function ProfilePage() {
             <FaArrowLeft/> Back
           </button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-             <h1 style={{ margin: 0, fontSize: '2.5rem', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
+             <h1 style={{ margin: 0, fontSize: isMobile ? '2rem' : '2.5rem', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 👋 Hi, {userName}!
              </h1>
-             <div style={{ padding: '5px 15px', background: rank.color, color: 'white', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '5px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
-                <span style={{fontSize: '1.2rem'}}>{rank.icon}</span> {rank.title} (Lvl {Math.floor(totalScore / 10)})
+             <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
+                <div style={{ padding: '5px 15px', background: rank.color, color: 'white', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '5px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+                    <span style={{fontSize: '1.2rem'}}>{rank.icon}</span> {rank.title} (Lvl {Math.floor(totalScore / 10)})
+                </div>
+                <div style={{ padding: '5px 15px', background: 'rgba(255, 193, 7, 0.1)', color: '#ffc107', border: '1px solid #ffc107', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 0 10px rgba(255, 193, 7, 0.2)' }}>
+                    ⭐ {totalScore} Points
+                </div>
              </div>
-             <div style={{ 
-                padding: '5px 15px', 
-                background: 'rgba(255, 193, 7, 0.1)', 
-                color: '#ffc107', 
-                border: '1px solid #ffc107',
-                borderRadius: '20px', 
-                fontWeight: 'bold', 
-                fontSize: '0.9rem', 
-                display: 'flex', alignItems: 'center', gap: '5px',
-                boxShadow: '0 0 10px rgba(255, 193, 7, 0.2)'
-            }}>
-            ⭐ {totalScore} Points
-            </div>
           </div>
           <p style={{ color: '#94a3b8', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
         </div>
 
-        {/* Recommendations (Glassmorphism) */}
+        {/* Recommendations */}
         {recommendations.length > 0 && (
-            <div style={{marginBottom:'40px', padding:'25px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius:'15px', color:'white', boxShadow:'0 4px 15px rgba(0,0,0,0.2)'}}>
+            <div style={{marginBottom:'40px', padding: isMobile ? '15px' : '25px', background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius:'15px', color:'white', boxShadow:'0 4px 15px rgba(0,0,0,0.2)'}}>
                 <h2 style={{margin:'0 0 20px 0', display:'flex', alignItems:'center', gap:'10px', fontSize:'1.4rem'}}>
                     <FaUserFriends color="#FFD700"/> Recommended for You:
                 </h2>
@@ -229,9 +223,9 @@ function ProfilePage() {
         )}
 
         {/* Tabs */}
-        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-            <button onClick={() => setActiveTab('library')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'library' ? '3px solid #00d2ff' : 'none', fontWeight:'bold', color: activeTab === 'library' ? '#00d2ff' : '#aaa', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaBook/> My Library</button>
-            <button onClick={() => setActiveTab('assessments')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'assessments' ? '3px solid #00d2ff' : 'none', fontWeight:'bold', color: activeTab === 'assessments' ? '#00d2ff' : '#aaa', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}><FaChartBar/> My Assessments</button>
+        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)', overflowX: 'auto'}}>
+            <button onClick={() => setActiveTab('library')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'library' ? '3px solid #00d2ff' : 'none', fontWeight:'bold', color: activeTab === 'library' ? '#00d2ff' : '#aaa', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', whiteSpace:'nowrap'}}><FaBook/> My Library</button>
+            <button onClick={() => setActiveTab('assessments')} style={{padding:'10px 20px', background:'none', border:'none', borderBottom: activeTab === 'assessments' ? '3px solid #00d2ff' : 'none', fontWeight:'bold', color: activeTab === 'assessments' ? '#00d2ff' : '#aaa', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', whiteSpace:'nowrap'}}><FaChartBar/> My Assessments</button>
         </div>
 
         {/* Folders List */}
@@ -273,13 +267,13 @@ function ProfilePage() {
                                 {expandedFolders[key] && (
                                     <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)' }}>
                                         {folder.hasRoadmap && (
-                                            <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem'}}>View Map 🗺️</button>
+                                            <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', width: isMobile ? '100%' : 'auto'}}>View Map 🗺️</button>
                                         )}
 
                                         {Object.keys(folder.subfolders).map(subNode => {
                                             const status = getNodeStatus(folder.displayTitle, subNode);
                                             return (
-                                                <div key={subNode} style={{ marginLeft: '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
+                                                <div key={subNode} style={{ marginLeft: isMobile ? '0' : '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
                                                     <h4 style={{ margin: '0 0 10px 0', color: 'white', display:'flex', alignItems:'center', gap:'10px' }}>
                                                       {status.hasPassed ? <FaCheckCircle color="#28a745"/> : <span style={{width:'16px'}}></span>}
                                                       {subNode}
