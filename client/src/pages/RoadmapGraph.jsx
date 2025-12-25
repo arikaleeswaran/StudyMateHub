@@ -1,33 +1,33 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap } from 'react-icons/fa';
+import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap, FaArrowDown } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
 import Navbar from '../components/Navbar';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase'; 
+import useMobile from '../hooks/useMobile';
 
 function RoadmapGraph() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { topic } = useParams();
+  const isMobile = useMobile(); // ✅ Hook
   
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); //Added trust_score
+  const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 });
   const [completedNodes, setCompletedNodes] = useState(new Set());
   const [progress, setProgress] = useState(0);
 
-  // Modal & Toast States
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizType, setQuizType] = useState('full'); 
   const [checkNode, setCheckNode] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-  
   const [loadingResources, setLoadingResources] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
   
@@ -129,23 +129,13 @@ function RoadmapGraph() {
     setSelectedNode(node);
     setResources({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); 
     setLoadingResources(true);
-    
     const params = new URLSearchParams(location.search);
     const mode = params.get('mode') || 'standard';
-
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        
-        // Construct params for backend
         const searchQuery = `${topic} ${node.label}`;
-        
         const res = await axios.get(`${baseUrl}/api/resources`, {
-            params: {
-                search_query: searchQuery,  // For YouTube/Google
-                topic_key: topic,           // For Supabase (Sentiment)
-                node_label: node.label,     // For Supabase (Sentiment)
-                mode: mode
-            }
+            params: { search_query: searchQuery, topic_key: topic, node_label: node.label, mode: mode }
         });
         setResources(res.data);
     } catch(e) { console.error(e); } 
@@ -155,7 +145,8 @@ function RoadmapGraph() {
     }
   };
 
-  const chunkSize = 4;
+  // ✅ MOBILE LAYOUT LOGIC
+  const chunkSize = isMobile ? 100 : 4; // On mobile, render all in one column basically
   const rows = [];
   for (let i = 0; i < nodes.length; i += chunkSize) rows.push(nodes.slice(i, i + chunkSize));
 
@@ -171,16 +162,16 @@ function RoadmapGraph() {
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
       {/* Header */}
-      <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top:'70px', zIndex:50 }}> 
+      <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
-            <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center' }}>
+            <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center', fontSize: isMobile ? '1.5rem' : '2rem' }}>
                 🗺️ Path: <span style={{color: '#00d2ff'}}>{topic}</span>
             </h2>
             <div style={{width:'100%', background:'rgba(255,255,255,0.1)', height:'10px', borderRadius:'5px', overflow:'hidden', marginBottom:'10px'}}>
                 <div style={{width:`${progress}%`, background:'#28a745', height:'100%', transition:'width 0.5s ease'}}></div>
             </div>
             <p style={{textAlign:'center', fontSize:'0.9rem', color:'#aaa', margin:0}}>{progress}% Completed</p>
-            <button onClick={handleSaveRoadmap} style={{position: 'absolute', right: '0', top: '0', padding: '8px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>💾 Save</button>
+            <button onClick={handleSaveRoadmap} style={{position: 'absolute', right: '0', top: '0', padding: '8px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>💾</button>
         </div>
       </div>
 
@@ -188,10 +179,17 @@ function RoadmapGraph() {
       <div style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {rows.map((row, rowIndex) => {
           const isEvenRow = rowIndex % 2 === 0;
-          const isLastRow = rowIndex === rows.length - 1;
           return (
             <div key={rowIndex} style={{ position: 'relative', width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '60px', flexDirection: isEvenRow ? 'row' : 'row-reverse', padding: '30px 0', zIndex: 2 }}>
+                <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    gap: isMobile ? '20px' : '60px', 
+                    flexDirection: isMobile ? 'column' : (isEvenRow ? 'row' : 'row-reverse'), // ✅ Stack vertically on mobile
+                    alignItems: 'center',
+                    padding: '30px 0', 
+                    zIndex: 2 
+                }}>
                     {row.map((node, i) => {
                         const globalIndex = rowIndex * chunkSize + i;
                         const isLocked = globalIndex > 0 && !completedNodes.has(nodes[globalIndex - 1].label);
@@ -199,11 +197,11 @@ function RoadmapGraph() {
                         const isSelected = selectedNode?.id === node.id;
                         
                         return (
-                            <div key={node.id} style={{ display: 'flex', alignItems: 'center', flexDirection: isEvenRow ? 'row' : 'row-reverse' }}>
+                            <div key={node.id} style={{ display: 'flex', alignItems: 'center', flexDirection: isMobile ? 'column' : (isEvenRow ? 'row' : 'row-reverse') }}>
                                 <div 
                                     onClick={() => handleNodeClick(node, globalIndex)} 
                                     style={{
-                                        width: '180px', height: '180px',
+                                        width: isMobile ? '140px' : '180px', height: isMobile ? '140px' : '180px',
                                         borderRadius: '50%',
                                         background: isCompleted ? 'rgba(40, 167, 69, 0.2)' : isSelected ? 'rgba(0, 210, 255, 0.2)' : 'rgba(255,255,255,0.05)',
                                         border: isLocked ? '3px solid #555' : isCompleted ? '3px solid #28a745' : isSelected ? '3px solid #00d2ff' : '3px solid rgba(255,255,255,0.2)',
@@ -218,16 +216,25 @@ function RoadmapGraph() {
                                 >
                                     {isLocked ? <FaLock size={20} color="#777" style={{marginBottom:'8px'}}/> : 
                                      isCompleted ? <FaCheckCircle color="#28a745" size={24} style={{marginBottom:'8px'}} /> : null}
-                                    <span style={{fontSize:'0.85rem', fontWeight:'bold', lineHeight:'1.3', padding:'0 5px'}}>
+                                    <span style={{fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight:'bold', lineHeight:'1.3', padding:'0 5px'}}>
                                         {node.label}
                                     </span>
                                 </div>
-                                {i < row.length - 1 && (<div style={{margin:'0 20px', fontSize:'24px', color: isCompleted ? '#28a745' : '#555'}}>{isEvenRow ? <FaArrowRight/> : <FaArrowLeft/>}</div>)}
+                                {i < row.length - 1 && (
+                                    <div style={{
+                                        margin: isMobile ? '10px 0' : '0 20px', 
+                                        fontSize: '24px', 
+                                        color: isCompleted ? '#28a745' : '#555'
+                                    }}>
+                                        {isMobile ? <FaArrowDown/> : (isEvenRow ? <FaArrowRight/> : <FaArrowLeft/>)}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
                 </div>
-                {!isLastRow && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed #555' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed #555', borderBottom: '4px dashed #555', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
+                {/* Dashed line logic (Hidden on mobile for simplicity) */}
+                {!isMobile && rowIndex < rows.length -1 && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed #555' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed #555', borderBottom: '4px dashed #555', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
             </div>
           );
         })}
@@ -238,51 +245,43 @@ function RoadmapGraph() {
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                 
-                {/*UPDATED HEADER WITH TRUST BADGE */}
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', flexWrap:'wrap', gap:'15px'}}>
-                    
-                    <div style={{display:'flex', alignItems:'center', gap:'20px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'10px', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center'}}>
                         <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
                             📚 Resources: <span style={{color:'#00d2ff'}}>{selectedNode.label}</span>
                         </h2>
-
                         {!loadingResources && resources.trust_score !== null && (
                             <div style={{
-                                padding: '8px 16px',
-                                borderRadius: '30px',
+                                padding: '8px 16px', borderRadius: '30px',
                                 background: resources.trust_score >= 80 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)',
                                 border: resources.trust_score >= 80 ? '1px solid #28a745' : '1px solid #ffc107',
                                 color: resources.trust_score >= 80 ? '#28a745' : '#ffc107',
-                                fontWeight: 'bold',
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                fontSize: '0.9rem',
-                                animation: 'fadeIn 0.5s'
+                                fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', animation: 'fadeIn 0.5s'
                             }}>
-                                {resources.trust_score >= 80 ? '🔥' : '😐'} 
-                                {resources.trust_score}% Satisfaction 
-                                <span style={{fontSize:'0.8rem', opacity:0.8}}>({resources.review_count} reviews)</span>
+                                {resources.trust_score >= 80 ? '🔥' : '😐'} {resources.trust_score}% Satisfaction <span style={{fontSize:'0.8rem', opacity:0.8}}>({resources.review_count} reviews)</span>
                             </div>
                         )}
                     </div>
-                    
                     {!completedNodes.has(selectedNode.label) && (
-                        <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', boxShadow:'0 4px 6px rgba(0,0,0,0.1)'}}>
-                            <FaGraduationCap size={24}/>
-                            Take Assessment (10 Qs)
+                        <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', width: isMobile ? '100%' : 'auto', justifyContent: 'center'}}>
+                            <FaGraduationCap size={24}/> Take Assessment
                         </button>
                     )}
                 </div>
                 
                 {loadingResources ? <div className="spinner"></div> : (
-                    <div style={{display:'flex', gap:'30px', flexWrap:'wrap'}}>
+                    <div style={{display:'flex', gap:'30px', flexWrap:'wrap', flexDirection: isMobile ? 'column' : 'row'}}>
+                        {/* Videos */}
                         <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
                             <h3 style={{borderBottom:'2px solid #ff6b6b', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaPlayCircle color="#ff6b6b"/> Videos</h3>
                             <div style={{display:'grid', gap:'15px'}}>{resources.videos.map((v, i) => (<div key={i} style={{display:'flex', gap:'10px', alignItems:'center'}}><a href={v.url} target="_blank" rel="noreferrer" style={{display:'flex', gap:'10px', textDecoration:'none', color:'white', width:'100%'}}><img src={v.thumbnail} style={{width:'80px', height:'60px', borderRadius:'5px', objectFit:'cover'}} /><div style={{flex:1}}><div style={{fontSize:'0.9rem', fontWeight:'bold', lineHeight:'1.2'}}>{v.title.slice(0, 50)}...</div><div style={{fontSize:'0.8rem', color:'#aaa'}}>{v.channel}</div></div></a><button onClick={() => handleSaveResource(v, 'video')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
+                        {/* Articles */}
                         <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
                              <h3 style={{borderBottom:'2px solid #4caf50', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaGlobe color="#4caf50"/> Articles</h3>
                              <div style={{display:'grid', gap:'10px'}}>{resources.articles?.map((a, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={a.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'1.2rem'}}>📄</span><div style={{fontWeight:'bold', fontSize:'0.95rem'}}>{a.title}</div></a><button onClick={() => handleSaveResource(a, 'article')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
+                        {/* PDFs */}
                         <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
                              <h3 style={{borderBottom:'2px solid #ffc107', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaFilePdf color="#ffc107"/> Cheat Sheets</h3>
                              <div style={{display:'grid', gap:'10px'}}>{resources.pdfs.map((p, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={p.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><FaFilePdf color="#dc3545"/><span style={{fontSize:'0.9rem', fontWeight:'500'}}>{p.title}</span></a><button onClick={() => handleSaveResource(p, 'pdf')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>

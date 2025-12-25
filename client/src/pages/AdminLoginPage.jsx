@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaUserShield, FaLock } from 'react-icons/fa';
+import useMobile from '../hooks/useMobile';
 
 function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const isMobile = useMobile();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ function AdminLoginPage() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0f172a', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', fontFamily: 'Segoe UI' }}>
-      <div style={{ width: '400px', padding: '40px', background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '15px', backdropFilter: 'blur(10px)', textAlign: 'center' }}>
+      <div style={{ width: '100%', maxWidth: '400px', padding: isMobile ? '30px' : '40px', margin: '20px', background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '15px', backdropFilter: 'blur(10px)', textAlign: 'center' }}>
         <div style={{ marginBottom: '20px' }}><FaUserShield size={50} color="#00d2ff" /></div>
         <h2 style={{ marginBottom: '5px' }}>Admin Protocol</h2>
         <p style={{ color: '#64748b', marginBottom: '30px' }}>Restricted Access Only</p>

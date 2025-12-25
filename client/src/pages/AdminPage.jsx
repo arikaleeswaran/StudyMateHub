@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { FaUsers, FaMapMarkedAlt, FaSmile, FaTrash } from 'react-icons/fa';
+import useMobile from '../hooks/useMobile';
 
 function AdminPage() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ function AdminPage() {
   const [students, setStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const isMobile = useMobile();
 
   useEffect(() => {
       const isAdmin = localStorage.getItem('admin_auth');
@@ -57,8 +59,8 @@ function AdminPage() {
     <div style={{ width: '100vw', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', color: 'white', display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}><Navbar /></div>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px', width: '100%' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>⚡ Admin Command Center</h1>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px' : '40px', width: '100%' }}>
+        <h1 style={{ fontSize: isMobile ? '2rem' : '2.5rem', marginBottom: '10px' }}>⚡ Admin Command Center</h1>
         <p style={{ color: '#aaa', marginBottom: '40px' }}>Monitor platform health, student marks, and content.</p>
 
         {/* --- STATS WIDGETS --- */}
@@ -78,10 +80,10 @@ function AdminPage() {
         </div>
 
         {/* --- TABS --- */}
-        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
-            <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, borderBottom: activeTab === 'dashboard' ? '3px solid #00d2ff' : 'none', color: activeTab==='dashboard'?'#00d2ff':'#aaa'}}>Recent Roadmaps</button>
-            <button onClick={() => setActiveTab('students')} style={{...styles.tab, borderBottom: activeTab === 'students' ? '3px solid #00d2ff' : 'none', color: activeTab==='students'?'#00d2ff':'#aaa'}}>Student Marks</button>
-            <button onClick={() => setActiveTab('feedback')} style={{...styles.tab, borderBottom: activeTab === 'feedback' ? '3px solid #00d2ff' : 'none', color: activeTab==='feedback'?'#00d2ff':'#aaa'}}>User Feedback</button>
+        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)', overflowX: 'auto'}}>
+            <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, borderBottom: activeTab === 'dashboard' ? '3px solid #00d2ff' : 'none', color: activeTab==='dashboard'?'#00d2ff':'#aaa', whiteSpace: 'nowrap'}}>Recent Roadmaps</button>
+            <button onClick={() => setActiveTab('students')} style={{...styles.tab, borderBottom: activeTab === 'students' ? '3px solid #00d2ff' : 'none', color: activeTab==='students'?'#00d2ff':'#aaa', whiteSpace: 'nowrap'}}>Student Marks</button>
+            <button onClick={() => setActiveTab('feedback')} style={{...styles.tab, borderBottom: activeTab === 'feedback' ? '3px solid #00d2ff' : 'none', color: activeTab==='feedback'?'#00d2ff':'#aaa', whiteSpace: 'nowrap'}}>User Feedback</button>
         </div>
 
         {/* --- CONTENT AREA --- */}

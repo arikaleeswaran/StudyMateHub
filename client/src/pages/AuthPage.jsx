@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios'; // ✅ Need axios for Admin API
+import axios from 'axios';
 import Navbar from '../components/Navbar'; 
+import useMobile from '../hooks/useMobile';
 
 function AuthPage() {
   const [loading, setLoading] = useState(false);
@@ -13,6 +14,7 @@ function AuthPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const isMobile = useMobile();
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -20,17 +22,15 @@ function AuthPage() {
     setError('');
     setMessage('');
 
-    // 🚀 STEP 1: CHECK FOR ADMIN LOGIN FIRST
-    // (Only if logging in, not signing up)
-    if (!isSignUp && email.toLowerCase() === 'admin@studymate.com') { // 👈 Check for specific admin email
+    if (!isSignUp && email.toLowerCase() === 'admin@studymate.com') {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
             const res = await axios.post(`${baseUrl}/api/admin/login`, { email, password });
             
             if (res.data.success) {
-                localStorage.setItem('admin_auth', 'true'); // Save Admin Token
-                navigate('/admin/dashboard'); // Redirect to Admin Dashboard
-                return; // Stop execution here
+                localStorage.setItem('admin_auth', 'true'); 
+                navigate('/admin/dashboard'); 
+                return; 
             }
         } catch (err) {
             setError('❌ Invalid Admin Credentials');
@@ -39,7 +39,6 @@ function AuthPage() {
         }
     }
 
-    // 🚀 STEP 2: NORMAL STUDENT LOGIN (Supabase)
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
@@ -55,7 +54,7 @@ function AuthPage() {
           password,
         });
         if (error) throw error;
-        navigate('/profile'); // Redirect students to Profile
+        navigate('/profile'); 
       }
     } catch (err) {
       setError(err.message);
@@ -69,7 +68,7 @@ function AuthPage() {
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}><Navbar /></div>
       
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-        <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '40px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)' }}>
+        <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: isMobile ? '30px' : '40px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>
              {isSignUp ? "Join the Hub 🚀" : "Welcome Back 👋"}
           </h2>

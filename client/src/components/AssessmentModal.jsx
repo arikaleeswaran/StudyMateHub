@@ -13,7 +13,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
   const [quizFinished, setQuizFinished] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
 
-  // ✅ NEW: State for Instant Feedback
+  // State for Instant Feedback
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
@@ -22,8 +22,8 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
       setScore(0);
       setCurrentQ(0);
       setQuizFinished(false);
-      setIsAnswered(false);      // Reset
-      setSelectedOption(null);   // Reset
+      setIsAnswered(false);      
+      setSelectedOption(null);   
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         const res = await fetch(`${baseUrl}/api/quiz?main_topic=${mainTopic}&sub_topic=${subTopic}&num=${questionCount}`);
@@ -45,9 +45,8 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
     loadQuiz();
   }, [mainTopic, subTopic, questionCount]);
 
-  // ✅ HANDLE SELECTION (Don't advance yet)
   const handleAnswer = (optionIndex) => {
-    if (isAnswered) return; // Prevent changing answer
+    if (isAnswered) return; 
     
     setSelectedOption(optionIndex);
     setIsAnswered(true);
@@ -57,7 +56,6 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
     }
   };
 
-  // ✅ HANDLE NEXT QUESTION
   const handleNext = () => {
     setIsAnswered(false);
     setSelectedOption(null);
@@ -90,50 +88,51 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
     );
   }
 
-  // Helper to determine button style based on answer state
   const getOptionStyle = (index) => {
       const isSelected = selectedOption === index;
       const isCorrect = index === questions[currentQ].correct_answer;
       
-      if (!isAnswered) {
-          // Default State
-          return { background: 'white', border: '1px solid #ddd', color: '#333' };
-      }
-
-      if (isCorrect) {
-          // ✅ Always highlight the correct answer in Green
-          return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' };
-      }
-
-      if (isSelected && !isCorrect) {
-          // ❌ Highlight wrong selection in Red
-          return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' };
-      }
-
-      // Fade out other unselected options
+      if (!isAnswered) return { background: 'white', border: '1px solid #ddd', color: '#333' };
+      if (isCorrect) return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' };
+      if (isSelected && !isCorrect) return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' };
+      
       return { background: '#f9f9f9', border: '1px solid #eee', color: '#aaa', opacity: 0.6 };
   };
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card" style={{ maxWidth: '750px', padding: '0', overflow: 'hidden', textAlign:'left' }}>
+      {/* ✅ FIX: 
+          1. Changed maxWidth to 95% for mobile
+          2. Added maxHeight: '90vh' to fit on screen
+          3. Changed overflow: 'hidden' -> 'auto' to enable scrolling 
+      */}
+      <div className="modal-card" style={{ 
+          maxWidth: '750px', 
+          width: '95%', 
+          maxHeight: '90vh', 
+          padding: '0', 
+          overflowY: 'auto', 
+          textAlign:'left',
+          borderRadius: '15px',
+          background: 'white',
+          position: 'relative'
+      }}>
         
         {!quizFinished ? (
-          /* --- QUESTION UI --- */
           <>
-            <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
                 <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Assessment"}: {subTopic}</h3>
                 <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
                     Q{currentQ + 1}/{questions.length}
                 </span>
             </div>
             
-            <div style={{ width: '100%', height: '6px', background: '#eee' }}>
+            <div style={{ width: '100%', height: '6px', background: '#eee', position: 'sticky', top: '60px', zIndex: 9 }}>
                 <div style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, height: '100%', background: '#007bff', transition: 'width 0.3s ease' }}></div>
             </div>
 
-            <div style={{ padding: '40px 40px 20px 40px' }}>
-                <div style={{ fontSize: '1.2rem', marginBottom: '25px', lineHeight: '1.6', color:'#222', fontWeight:'500' }}>
+            <div style={{ padding: '30px' }}>
+                <div style={{ fontSize: '1.1rem', marginBottom: '25px', lineHeight: '1.6', color:'#222', fontWeight:'500' }}>
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                         {questions[currentQ].question}
                     </ReactMarkdown>
@@ -146,7 +145,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
                             <button 
                                 key={i} 
                                 onClick={() => handleAnswer(i)} 
-                                disabled={isAnswered} // 🔒 Lock buttons after answering
+                                disabled={isAnswered} 
                                 style={{
                                     textAlign:'left', padding:'15px', borderRadius:'8px', cursor: isAnswered ? 'default' : 'pointer',
                                     transition:'all 0.2s', display:'flex', justifyContent:'space-between', alignItems:'center',
@@ -157,7 +156,6 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
                                     <span style={{ fontWeight: 'bold', marginRight: '15px', opacity: 0.7 }}>{String.fromCharCode(65 + i)}</span>
                                     <span>{opt}</span>
                                 </div>
-                                {/* Icon for feedback */}
                                 {isAnswered && i === questions[currentQ].correct_answer && <FaCheckCircle color="#28a745"/>}
                                 {isAnswered && selectedOption === i && i !== questions[currentQ].correct_answer && <FaTimesCircle color="#dc3545"/>}
                             </button>
@@ -166,8 +164,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
                 </div>
             </div>
 
-            {/* ✅ NEXT BUTTON AREA (Only visible after answering) */}
-            <div style={{ height: '80px', padding: '0 40px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <div style={{ height: '80px', padding: '0 30px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', background: 'white', borderTop: '1px solid #eee' }}>
                 {isAnswered && (
                     <button onClick={handleNext} style={{
                         padding: '12px 30px', background: '#007bff', color: 'white', border: 'none', borderRadius: '30px',
@@ -180,7 +177,6 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
             </div>
           </>
         ) : (
-          /* --- RESULT UI (Keep Existing Logic) --- */
           <div style={{ padding: '50px', textAlign:'center' }}>
             <div style={{ fontSize: '5rem', marginBottom: '20px' }}>
                 {hasPassed ? "🏆" : "⚠️"}
@@ -204,12 +200,12 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems:'center' }}>
-                    <div style={{display:'flex', gap:'10px', width:'100%'}}>
-                        <button onClick={handleRetakeSelf} style={{ flex:1, padding: '12px', background: '#e9ecef', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>
+                    <div style={{display:'flex', gap:'10px', width:'100%', flexDirection: 'column'}}> 
+                        <button onClick={handleRetakeSelf} style={{ padding: '12px', background: '#e9ecef', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
                             🔄 Retake
                         </button>
                         {questionCount === 5 && (
-                            <button onClick={handleSwitchToFull} style={{ flex:1, padding: '12px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }}>
+                            <button onClick={handleSwitchToFull} style={{ padding: '12px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
                                 🎓 Take Full Exam
                             </button>
                         )}
