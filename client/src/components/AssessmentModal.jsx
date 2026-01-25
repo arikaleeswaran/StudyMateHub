@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';          
 import { FaCheckCircle, FaTimesCircle, FaArrowRight } from 'react-icons/fa';
 
-function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onComplete, onRetry }) {
+function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10, onClose, onComplete, onRetry }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentQ, setCurrentQ] = useState(0);
@@ -13,7 +13,6 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
   const [quizFinished, setQuizFinished] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
 
-  // State for Instant Feedback
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
@@ -26,7 +25,11 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
       setSelectedOption(null);   
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        const res = await fetch(`${baseUrl}/api/quiz?main_topic=${mainTopic}&sub_topic=${subTopic}&num=${questionCount}`);
+        
+        // Include History in URL
+        const url = `${baseUrl}/api/quiz?main_topic=${encodeURIComponent(mainTopic)}&sub_topic=${encodeURIComponent(subTopic)}&num=${questionCount}&history=${encodeURIComponent(history)}`;
+        
+        const res = await fetch(url);
         const data = await res.json();
         
         if (Array.isArray(data) && data.length > 0) {
@@ -82,7 +85,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
         <div className="modal-overlay" style={{ flexDirection: 'column' }}>
             <div className="spinner"></div>
             <h3 style={{color:'white', marginTop:'20px', fontWeight: '300'}}>
-                Generating {questionCount === 5 ? "Quick Check" : "Assessment"} ({questionCount} Qs)... 🧠
+                Generating {questionCount === 5 ? "Quick Check" : "Advanced Assessment"} ({questionCount} Qs)... 🧠
             </h3>
         </div>
     );
@@ -101,27 +104,15 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
 
   return (
     <div className="modal-overlay">
-      {/* ✅ FIX: 
-          1. Changed maxWidth to 95% for mobile
-          2. Added maxHeight: '90vh' to fit on screen
-          3. Changed overflow: 'hidden' -> 'auto' to enable scrolling 
-      */}
       <div className="modal-card" style={{ 
-          maxWidth: '750px', 
-          width: '95%', 
-          maxHeight: '90vh', 
-          padding: '0', 
-          overflowY: 'auto', 
-          textAlign:'left',
-          borderRadius: '15px',
-          background: 'white',
-          position: 'relative'
+          maxWidth: '750px', width: '95%', maxHeight: '90vh', padding: '0', 
+          overflowY: 'auto', textAlign:'left', borderRadius: '15px', background: 'white', position: 'relative'
       }}>
         
         {!quizFinished ? (
           <>
             <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
-                <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Assessment"}: {subTopic}</h3>
+                <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
                 <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
                     Q{currentQ + 1}/{questions.length}
                 </span>
@@ -189,7 +180,7 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
             <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '30px' }}>
                 You scored <strong>{score} / {questions.length}</strong>.
                 <br/>
-                {hasPassed ? "Great job! Knowledge verified." : "You need 60% to pass."}
+                {hasPassed ? "Excellent work! Knowledge verified." : "Review the material and try again."}
             </p>
 
             {hasPassed ? (
@@ -204,11 +195,6 @@ function AssessmentModal({ mainTopic, subTopic, questionCount = 10, onClose, onC
                         <button onClick={handleRetakeSelf} style={{ padding: '12px', background: '#e9ecef', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
                             🔄 Retake
                         </button>
-                        {questionCount === 5 && (
-                            <button onClick={handleSwitchToFull} style={{ padding: '12px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
-                                🎓 Take Full Exam
-                            </button>
-                        )}
                     </div>
                     <button onClick={handleSubmit} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
                         Close & Save Progress

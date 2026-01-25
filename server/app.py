@@ -442,20 +442,65 @@ def get_roadmap():
 
 @app.route('/api/quiz', methods=['GET'])
 def get_quiz():
-    main, sub, num = request.args.get('main_topic'), request.args.get(
-        'sub_topic'), request.args.get('num', '10')
-    prompt = f"""Create a {num}-question multiple-choice assessment for '{sub}' (Context: {main}) in English. JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]"""
+    main = request.args.get('main_topic')
+    sub = request.args.get('sub_topic')
+    num = request.args.get('num', '10')
+    history = request.args.get('history', '')
+
+    difficulty_instruction = """
+    DIFFICULTY: INTERMEDIATE to ADVANCED. 
+    - Questions must be SCENARIO-BASED or CODE ANALYSIS (e.g., "What is the output?", "Find the bug", "Best pattern for...").
+    - No simple definitions.
+    """
+
+    if history:
+        # CUMULATIVE EXAM
+        prompt = f"""
+        Create a {num}-question multiple-choice assessment for a student learning '{main}'.
+        
+        CURRENT TOPIC: '{sub}'
+        PREVIOUSLY LEARNED: '{history}'
+        
+        {difficulty_instruction}
+        
+        DISTRIBUTION INSTRUCTIONS:
+        1. ~70% of questions must focus strictly on the CURRENT TOPIC ('{sub}').
+        2. ~30% of questions should integrate concepts from PREVIOUSLY LEARNED topics to test retention (e.g., how '{sub}' interacts with '{history}').
+        
+        Return strict JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]
+        """
+    else:
+        # FIRST MODULE
+        prompt = f"""
+        Create a {num}-question multiple-choice assessment for the topic: '{sub}' (Context: '{main}').
+        
+        {difficulty_instruction}
+        
+        INSTRUCTIONS:
+        - Focus 100% on '{sub}'.
+        - Deep dive into edge cases and implementation details.
+        
+        Return strict JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]
+        """
+
     try:
-        completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
-                                                         {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
+        completion = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
         data = parse_json_safely(completion.choices[0].message.content, "list")
+
         if isinstance(data, dict):
             for k in data:
                 if isinstance(data[k], list):
                     return jsonify(data[k])
+
         return jsonify(data if data else [])
-    except:
-        return jsonify([{"question": "Error generating quiz", "options": ["OK"], "correct_answer": 0}])
+    except Exception as e:
+        print(f"Quiz Gen Error: {e}")
+        return jsonify([{"question": "Error generating quiz. Please retry.", "options": ["OK"], "correct_answer": 0}])
 
 
 @app.route('/api/resources', methods=['GET'])
