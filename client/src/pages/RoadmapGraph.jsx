@@ -15,7 +15,7 @@ function RoadmapGraph() {
   const navigate = useNavigate();
   const location = useLocation();
   const { topic } = useParams();
-  const isMobile = useMobile(); // ✅ Hook
+  const isMobile = useMobile(); 
   
   const [nodes, setNodes] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -40,6 +40,8 @@ function RoadmapGraph() {
         setMapLoading(true);
         const params = new URLSearchParams(location.search);
         const mode = params.get('mode') || 'standard';
+        
+        // 1. Load Data
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
             const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}`);
@@ -49,11 +51,22 @@ function RoadmapGraph() {
             if (mode === 'panic') showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
         } catch(e) { console.error(e); }
 
+        // 2. Load Progress (User OR Guest)
         if (user) {
             const { data } = await supabase.from('node_progress').select('node_label, quiz_score').eq('user_id', user.id).eq('topic', topic);
             if (data) {
                 const passedNodes = data.filter(d => d.quiz_score >= 3).map(d => d.node_label);
                 setCompletedNodes(new Set(passedNodes));
+            }
+        } else {
+            // Check Guest Data
+            const guestDataRaw = localStorage.getItem('guest_data');
+            if (guestDataRaw) {
+                const guestData = JSON.parse(guestDataRaw);
+                const passedGuest = guestData.progress
+                    .filter(p => p.topic === topic && p.quiz_score >= 3)
+                    .map(p => p.node_label);
+                setCompletedNodes(new Set(passedGuest));
             }
         }
         setMapLoading(false);
@@ -70,8 +83,22 @@ function RoadmapGraph() {
 
   const showNotification = (msg, type='success') => { setToast({ show: true, message: msg, type }); };
 
+  // --- NEW GUEST HELPER ---
+  const saveToLocalGuest = (key, data) => {
+    const existing = JSON.parse(localStorage.getItem('guest_data') || '{"roadmap": null, "progress": [], "resources": []}');
+    if (key === 'roadmap') existing.roadmap = data;
+    else if (key === 'progress') existing.progress.push(data);
+    else if (key === 'resources') existing.resources.push(data);
+    localStorage.setItem('guest_data', JSON.stringify(existing));
+  };
+
   const handleSaveRoadmap = async () => {
-    if (!user) { navigate('/auth'); return; }
+    if (!user) { 
+        saveToLocalGuest('roadmap', { topic: topic, graph_data: { nodes: nodes } });
+        showNotification("⚠️ Saved locally! Login to save permanently.", "warning");
+        setTimeout(() => navigate('/auth'), 2000); // Optional Redirect
+        return; 
+    }
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_roadmap`, { user_id: user.id, topic: topic, graph_data: { nodes: nodes } });
@@ -80,11 +107,21 @@ function RoadmapGraph() {
   };
 
   const handleSaveResource = async (item, type) => {
-    if (!user) return showNotification("Login required to save", "error");
+    const resourceData = {
+        roadmap_topic: topic, node_label: selectedNode.label, resource_type: type, 
+        title: item.title, url: item.url, thumbnail: item.thumbnail || ''
+    };
+
+    if (!user) {
+        saveToLocalGuest('resources', resourceData);
+        showNotification("Saved to guest library! 📚 (Login to keep)", "warning");
+        return;
+    }
+
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_resource`, {
-            user_id: user.id, roadmap_topic: topic, node_label: selectedNode.label, resource_type: type, title: item.title, url: item.url, thumbnail: item.thumbnail || ''
+            user_id: user.id, ...resourceData
         });
         showNotification("Resource added to Library! 📚");
     } catch(e) { showNotification("Error saving resource", "error"); }
@@ -102,23 +139,33 @@ function RoadmapGraph() {
 
   const handleQuizComplete = async (score, feedback) => {
     setShowQuizModal(false);
+    
+    const progressData = {
+        topic: topic, 
+        node_label: checkNode.label, 
+        quiz_score: score, 
+        feedback_text: feedback,
+        sentiment_score: 0 
+    };
+
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
             await axios.post(`${baseUrl}/api/submit_progress`, { 
                 user_id: user.id, 
                 username: user.user_metadata?.full_name || user.email.split('@')[0],
-                topic: topic, 
-                node_label: checkNode.label, 
-                score: score, 
-                feedback: feedback 
+                ...progressData
             });
         } catch(e) { console.error(e); }
+    } else {
+        // Guest Save
+        saveToLocalGuest('progress', progressData);
     }
+
     let passed = quizType === 'diagnostic' ? score >= 3 : score >= 6; 
     if (passed) {
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
-        showNotification("🎉 Module Passed! Unlocked next step.");
+        showNotification(user ? "🎉 Module Passed! Unlocked next step." : "🎉 Guest: Module Passed! (Login to save)");
     } else {
         if (quizType === 'diagnostic') fetchResources(checkNode); 
         else showNotification("Keep studying! Try again later.", "error");
@@ -145,8 +192,7 @@ function RoadmapGraph() {
     }
   };
 
-  // ✅ MOBILE LAYOUT LOGIC
-  const chunkSize = isMobile ? 100 : 4; // On mobile, render all in one column basically
+  const chunkSize = isMobile ? 100 : 4; 
   const rows = [];
   for (let i = 0; i < nodes.length; i += chunkSize) rows.push(nodes.slice(i, i + chunkSize));
 
@@ -185,7 +231,7 @@ function RoadmapGraph() {
                     display: 'flex', 
                     justifyContent: 'center', 
                     gap: isMobile ? '20px' : '60px', 
-                    flexDirection: isMobile ? 'column' : (isEvenRow ? 'row' : 'row-reverse'), // ✅ Stack vertically on mobile
+                    flexDirection: isMobile ? 'column' : (isEvenRow ? 'row' : 'row-reverse'), 
                     alignItems: 'center',
                     padding: '30px 0', 
                     zIndex: 2 
@@ -233,7 +279,6 @@ function RoadmapGraph() {
                         );
                     })}
                 </div>
-                {/* Dashed line logic (Hidden on mobile for simplicity) */}
                 {!isMobile && rowIndex < rows.length -1 && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed #555' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed #555', borderBottom: '4px dashed #555', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
             </div>
           );

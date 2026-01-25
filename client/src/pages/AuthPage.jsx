@@ -16,6 +16,30 @@ function AuthPage() {
   const navigate = useNavigate();
   const isMobile = useMobile();
 
+  // --- NEW SYNC FUNCTION ---
+  const syncGuestData = async (userId) => {
+    const guestDataRaw = localStorage.getItem('guest_data');
+    if (!guestDataRaw) return; 
+
+    const guestData = JSON.parse(guestDataRaw);
+    if (!guestData.roadmap && guestData.progress.length === 0 && guestData.resources.length === 0) return;
+
+    try {
+        setMessage("Syncing your guest progress... ⏳");
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        
+        await axios.post(`${baseUrl}/api/sync_guest_data`, {
+            user_id: userId,
+            guest_data: guestData
+        });
+        
+        localStorage.removeItem('guest_data');
+        setMessage("✅ Progress Merged Successfully!");
+    } catch (err) {
+        console.error("Sync failed", err);
+    }
+  };
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -40,22 +64,32 @@ function AuthPage() {
     }
 
     try {
+      let userId = null;
+
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName } },
         });
         if (error) throw error;
+        if (data.user) userId = data.user.id;
         setMessage('Check your email for the confirmation link!');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        navigate('/profile'); 
+        userId = data.user.id;
       }
+
+      // ✅ Trigger Sync
+      if (userId) {
+          await syncGuestData(userId);
+          setTimeout(() => navigate('/profile'), 1500); 
+      }
+
     } catch (err) {
       setError(err.message);
     } finally {
