@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';       
 import rehypeKatex from 'rehype-katex';     
 import 'katex/dist/katex.min.css';          
-import { FaCheckCircle, FaTimesCircle, FaArrowRight } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
 
 function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10, onClose, onComplete, onRetry }) {
   const [questions, setQuestions] = useState([]);
@@ -12,9 +12,11 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
   const [score, setScore] = useState(0);
   const [quizFinished, setQuizFinished] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
-
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
+
+  // 🔴 NEW: State for Custom Exit Popup
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const loadQuiz = async () => {
       setLoading(true);
@@ -25,8 +27,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
       setSelectedOption(null);   
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        
-        // Include History in URL
         const url = `${baseUrl}/api/quiz?main_topic=${encodeURIComponent(mainTopic)}&sub_topic=${encodeURIComponent(subTopic)}&num=${questionCount}&history=${encodeURIComponent(history)}`;
         
         const res = await fetch(url);
@@ -50,10 +50,8 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
 
   const handleAnswer = (optionIndex) => {
     if (isAnswered) return; 
-    
     setSelectedOption(optionIndex);
     setIsAnswered(true);
-
     if (optionIndex === questions[currentQ].correct_answer) {
       setScore(prev => prev + 1);
     }
@@ -62,7 +60,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
   const handleNext = () => {
     setIsAnswered(false);
     setSelectedOption(null);
-    
     if (currentQ + 1 < questions.length) {
       setCurrentQ(prev => prev + 1);
     } else {
@@ -80,6 +77,20 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
   const handleRetakeSelf = () => loadQuiz();
   const handleSwitchToFull = () => { if (onRetry) onRetry(); };
 
+  // 🔴 UPDATED: Trigger Custom Popup instead of window.confirm
+  const handleExitClick = () => {
+      setShowExitConfirm(true); 
+  };
+
+  const confirmQuit = () => {
+      setShowExitConfirm(false);
+      onClose(); // Close the modal effectively
+  };
+
+  const cancelQuit = () => {
+      setShowExitConfirm(false); // Just hide the popup
+  };
+
   if (loading) {
     return (
         <div className="modal-overlay" style={{ flexDirection: 'column' }}>
@@ -87,6 +98,7 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
             <h3 style={{color:'white', marginTop:'20px', fontWeight: '300'}}>
                 Generating {questionCount === 5 ? "Quick Check" : "Advanced Assessment"} ({questionCount} Qs)... 🧠
             </h3>
+            <button onClick={onClose} style={{marginTop:'20px', background:'none', border:'1px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 20px', borderRadius:'20px', cursor:'pointer'}}>Cancel</button>
         </div>
     );
   }
@@ -112,10 +124,18 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
         {!quizFinished ? (
           <>
             <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
-                <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
-                <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
-                    Q{currentQ + 1}/{questions.length}
-                </span>
+                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                    <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
+                </div>
+                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
+                        Q{currentQ + 1}/{questions.length}
+                    </span>
+                    {/* Trigger Custom Popup */}
+                    <button onClick={handleExitClick} style={{ background: '#dc3545', border: 'none', color: 'white', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', title: 'Quit Test' }}>
+                        <FaTimes size={14}/>
+                    </button>
+                </div>
             </div>
             
             <div style={{ width: '100%', height: '6px', background: '#eee', position: 'sticky', top: '60px', zIndex: 9 }}>
@@ -196,16 +216,52 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                             🔄 Retake
                         </button>
                     </div>
-                    <button onClick={handleSubmit} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
-                        Close & Save Progress
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
+                        Close & Discard Results
                     </button>
                 </div>
             )}
           </div>
         )}
+
+        {/* 🔴 CUSTOM EXIT CONFIRMATION OVERLAY */}
+        {showExitConfirm && (
+            <div style={{
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                zIndex: 20, borderRadius: '15px', backdropFilter: 'blur(5px)', flexDirection: 'column', padding: '20px', textAlign: 'center',
+                animation: 'fadeIn 0.2s'
+            }}>
+                <div style={{ background: '#1e293b', padding: '30px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '350px', width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+                    <div style={{marginBottom:'20px'}}>
+                        <FaExclamationTriangle size={40} color="#ff6b6b" />
+                    </div>
+                    <h2 style={{margin:'0 0 10px 0', color:'white', fontSize:'1.5rem'}}>Quit Assessment?</h2>
+                    <p style={{color:'#94a3b8', marginBottom:'25px', lineHeight:'1.5', fontSize:'1rem'}}>
+                       Are you sure you want to leave? <br/>
+                       <span style={{color:'#ff6b6b', fontWeight:'bold'}}>Your progress will not be saved.</span>
+                    </p>
+                    <div style={{display:'flex', gap:'15px', justifyContent:'center'}}>
+                        <button onClick={cancelQuit} style={{
+                            flex: 1, padding:'12px', background:'rgba(255,255,255,0.1)', color:'white', 
+                            border:'1px solid rgba(255,255,255,0.2)', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', transition: 'background 0.2s'
+                        }}>
+                            Cancel
+                        </button>
+                        <button onClick={confirmQuit} style={{
+                            flex: 1, padding:'12px', background:'#dc3545', color:'white', 
+                            border:'none', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', boxShadow: '0 4px 12px rgba(220, 53, 69, 0.4)'
+                        }}>
+                            Yes, Quit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
       <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );
