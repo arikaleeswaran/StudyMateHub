@@ -229,6 +229,62 @@ def admin_login():
         return jsonify({"success": False, "error": "Invalid credentials"}), 401
 
 
+@app.route('/api/sync_guest_data', methods=['POST'])
+def sync_guest_data():
+    data = request.json
+    user_id = data.get('user_id')
+    guest_data = data.get('guest_data', {})
+
+    if not user_id or not guest_data:
+        return jsonify({"error": "Missing data"}), 400
+
+    try:
+        # 1. Sync Roadmap
+        roadmap = guest_data.get('roadmap')
+        if roadmap:
+            supabase.table('user_roadmaps').upsert({
+                "user_id": user_id,
+                "topic": roadmap.get('topic', '').strip().title(),
+                "graph_data": roadmap.get('graph_data')
+            }).execute()
+
+        # 2. Sync Progress (Quiz Scores)
+        progress_list = guest_data.get('progress', [])
+        if progress_list:
+            for item in progress_list:
+                item['user_id'] = user_id
+                supabase.table('node_progress').insert(item).execute()
+
+                # Update Leaderboard
+                score = item.get('quiz_score', 0)
+                username = item.get('username', 'Scholar')
+                try:
+                    existing = supabase.table('leaderboard').select(
+                        '*').eq('user_id', user_id).execute()
+                    if existing.data:
+                        new_score = existing.data[0]['score'] + score
+                        supabase.table('leaderboard').update(
+                            {"score": new_score}).eq('user_id', user_id).execute()
+                    else:
+                        supabase.table('leaderboard').insert(
+                            {"user_id": user_id, "full_name": username, "score": score}).execute()
+                except:
+                    pass
+
+        # 3. Sync Saved Resources
+        resources_list = guest_data.get('resources', [])
+        if resources_list:
+            for res in resources_list:
+                res['user_id'] = user_id
+                supabase.table('saved_resources').insert(res).execute()
+
+        return jsonify({"success": True, "message": "Guest data merged successfully"})
+
+    except Exception as e:
+        print(f"Sync Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/recommendations', methods=['GET'])
 def get_recommendations():
     user_id = request.args.get('user_id')
