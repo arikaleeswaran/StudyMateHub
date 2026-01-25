@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';       
 import rehypeKatex from 'rehype-katex';     
 import 'katex/dist/katex.min.css';          
-import { FaCheckCircle, FaTimesCircle, FaArrowRight } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTimes } from 'react-icons/fa';
 
 function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10, onClose, onComplete, onRetry }) {
   const [questions, setQuestions] = useState([]);
@@ -25,8 +25,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
       setSelectedOption(null);   
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        
-        // Include History in URL
         const url = `${baseUrl}/api/quiz?main_topic=${encodeURIComponent(mainTopic)}&sub_topic=${encodeURIComponent(subTopic)}&num=${questionCount}&history=${encodeURIComponent(history)}`;
         
         const res = await fetch(url);
@@ -80,6 +78,14 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
   const handleRetakeSelf = () => loadQuiz();
   const handleSwitchToFull = () => { if (onRetry) onRetry(); };
 
+  // --- NEW: Handle Exit ---
+  const handleExit = () => {
+      // confirm is optional, but good for UX
+      if (window.confirm("Are you sure you want to quit? Progress will not be saved.")) {
+          onClose(); // Just close, do not trigger onComplete
+      }
+  };
+
   if (loading) {
     return (
         <div className="modal-overlay" style={{ flexDirection: 'column' }}>
@@ -87,6 +93,8 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
             <h3 style={{color:'white', marginTop:'20px', fontWeight: '300'}}>
                 Generating {questionCount === 5 ? "Quick Check" : "Advanced Assessment"} ({questionCount} Qs)... 🧠
             </h3>
+            {/* Allow exit even during loading if it gets stuck */}
+            <button onClick={onClose} style={{marginTop:'20px', background:'none', border:'1px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 20px', borderRadius:'20px', cursor:'pointer'}}>Cancel</button>
         </div>
     );
   }
@@ -112,10 +120,18 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
         {!quizFinished ? (
           <>
             <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
-                <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
-                <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
-                    Q{currentQ + 1}/{questions.length}
-                </span>
+                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                    <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
+                </div>
+                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
+                        Q{currentQ + 1}/{questions.length}
+                    </span>
+                    {/* 🔴 NEW EXIT BUTTON */}
+                    <button onClick={handleExit} style={{ background: '#dc3545', border: 'none', color: 'white', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', title: 'Quit Test' }}>
+                        <FaTimes size={14}/>
+                    </button>
+                </div>
             </div>
             
             <div style={{ width: '100%', height: '6px', background: '#eee', position: 'sticky', top: '60px', zIndex: 9 }}>
@@ -196,8 +212,9 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                             🔄 Retake
                         </button>
                     </div>
-                    <button onClick={handleSubmit} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
-                        Close & Save Progress
+                    {/* Updated Close Button Logic for Result Screen */}
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
+                        Close & Discard Results
                     </button>
                 </div>
             )}
