@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaUserShield, FaLock } from 'react-icons/fa';
+import { FaUserShield, FaLock, FaArrowLeft } from 'react-icons/fa'; // ✅ Import Icon
 import useMobile from '../hooks/useMobile';
 
 function AdminLoginPage() {
@@ -46,7 +46,10 @@ function AdminLoginPage() {
           <button type="submit" style={styles.button}>Authenticate</button>
         </form>
         
-        <button onClick={() => navigate('/')} style={{ marginTop: '20px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>← Return to Student Portal</button>
+        {/* ✅ Updated Back Button */}
+        <button onClick={() => navigate(-1)} style={{ marginTop: '20px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%' }}>
+            <FaArrowLeft size={12}/> Go Back
+        </button>
       </div>
     </div>
   );

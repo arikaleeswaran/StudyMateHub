@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // ✅ Import hook
 import Navbar from '../components/Navbar';
-import { FaTrophy, FaMedal, FaCrown } from 'react-icons/fa';
+import { FaTrophy, FaMedal, FaCrown, FaArrowLeft } from 'react-icons/fa'; // ✅ Import Arrow Icon
 import useMobile from '../hooks/useMobile';
 
 function LeaderboardPage() {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useMobile();
+  const navigate = useNavigate(); // ✅ Initialize hook
 
   useEffect(() => {
     const fetchLeaders = async () => {
@@ -25,9 +27,9 @@ function LeaderboardPage() {
   }, []);
 
   const getRankStyle = (index) => {
-      if (index === 0) return { icon: <FaCrown size={24} color="#FFD700"/>, color: '#FFD700', bg: 'rgba(255, 215, 0, 0.2)' }; // Gold
-      if (index === 1) return { icon: <FaMedal size={24} color="#C0C0C0"/>, color: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.2)' }; // Silver
-      if (index === 2) return { icon: <FaMedal size={24} color="#CD7F32"/>, color: '#CD7F32', bg: 'rgba(205, 127, 50, 0.2)' }; // Bronze
+      if (index === 0) return { icon: <FaCrown size={24} color="#FFD700"/>, color: '#FFD700', bg: 'rgba(255, 215, 0, 0.2)' }; 
+      if (index === 1) return { icon: <FaMedal size={24} color="#C0C0C0"/>, color: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.2)' }; 
+      if (index === 2) return { icon: <FaMedal size={24} color="#CD7F32"/>, color: '#CD7F32', bg: 'rgba(205, 127, 50, 0.2)' }; 
       return { icon: <span style={{fontWeight:'bold', fontSize:'1.2rem'}}>#{index + 1}</span>, color: 'white', bg: 'rgba(255,255,255,0.05)' };
   };
 
@@ -36,6 +38,19 @@ function LeaderboardPage() {
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}><Navbar /></div>
 
       <div style={{ maxWidth: '800px', margin: isMobile ? '20px auto' : '40px auto', padding: '20px', width: '90%' }}>
+        
+        {/* ✅ BACK BUTTON START */}
+        <button 
+            onClick={() => navigate(-1)} 
+            style={{
+                background: 'none', border: 'none', color: '#aaa', fontSize: '1rem', 
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px'
+            }}
+        >
+            <FaArrowLeft /> Back
+        </button>
+        {/* ✅ BACK BUTTON END */}
+
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <h1 style={{ fontSize: isMobile ? '2rem' : '3rem', margin: '0 0 10px 0' }}>🏆 Hall of Fame</h1>
             <p style={{ color: '#aaa', fontSize: isMobile ? '1rem' : '1.2rem' }}>Top students mastering the tech world.</p>
