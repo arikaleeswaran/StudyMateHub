@@ -3,6 +3,8 @@ import json
 import re
 import requests
 import urllib.parse
+import random
+import string
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -213,7 +215,101 @@ def get_pdfs(topic, mode='standard', max_results=4):
             pdfs.append(link)
     return pdfs
 
-# --- API ROUTES ---
+# --- SQUAD ROUTES (NEW) ---
+
+
+@app.route('/api/squad/create', methods=['POST'])
+def create_squad():
+    data = request.json
+    user_id = data.get('user_id')
+    squad_name = data.get('name')
+
+    # Generate random 6-char code
+    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+    try:
+        # 1. Create Squad
+        new_squad = supabase.table('squads').insert({
+            "name": squad_name,
+            "join_code": code,
+            "total_score": 0
+        }).execute()
+
+        squad_id = new_squad.data[0]['id']
+
+        # 2. Add Creator to Squad
+        supabase.table('leaderboard').update(
+            {"squad_id": squad_id}).eq("user_id", user_id).execute()
+
+        return jsonify({"success": True, "squad": new_squad.data[0]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/squad/join', methods=['POST'])
+def join_squad():
+    data = request.json
+    user_id = data.get('user_id')
+    code = data.get('code').strip().upper()
+
+    try:
+        # 1. Find Squad
+        squad = supabase.table('squads').select(
+            "*").eq("join_code", code).execute()
+        if not squad.data:
+            return jsonify({"error": "Invalid Squad Code"}), 404
+
+        squad_id = squad.data[0]['id']
+
+        # 2. Update User
+        supabase.table('leaderboard').update(
+            {"squad_id": squad_id}).eq("user_id", user_id).execute()
+
+        return jsonify({"success": True, "squad": squad.data[0]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/squad/my_squad', methods=['GET'])
+def get_my_squad():
+    user_id = request.args.get('user_id')
+    try:
+        # Get user's squad_id
+        user_entry = supabase.table('leaderboard').select(
+            'squad_id').eq('user_id', user_id).execute()
+
+        if not user_entry.data or not user_entry.data[0]['squad_id']:
+            return jsonify(None)  # No squad
+
+        squad_id = user_entry.data[0]['squad_id']
+
+        # Get Squad Details
+        squad_info = supabase.table('squads').select(
+            '*').eq('id', squad_id).execute()
+
+        # Get Squad Members
+        members = supabase.table('leaderboard').select(
+            '*').eq('squad_id', squad_id).order('score', desc=True).execute()
+
+        return jsonify({
+            "details": squad_info.data[0],
+            "members": members.data
+        })
+    except Exception as e:
+        return jsonify(None)
+
+
+@app.route('/api/squad/leaderboard', methods=['GET'])
+def get_squad_leaderboard():
+    try:
+        # Get Top 10 Squads
+        res = supabase.table('squads').select(
+            '*').order('total_score', desc=True).limit(10).execute()
+        return jsonify(res.data)
+    except:
+        return jsonify([])
+
+# --- EXISTING ROUTES ---
 
 
 @app.route('/api/admin/login', methods=['POST'])
@@ -255,21 +351,12 @@ def sync_guest_data():
                 item['user_id'] = user_id
                 supabase.table('node_progress').insert(item).execute()
 
-                # Update Leaderboard
-                score = item.get('quiz_score', 0)
-                username = item.get('username', 'Scholar')
-                try:
-                    existing = supabase.table('leaderboard').select(
-                        '*').eq('user_id', user_id).execute()
-                    if existing.data:
-                        new_score = existing.data[0]['score'] + score
-                        supabase.table('leaderboard').update(
-                            {"score": new_score}).eq('user_id', user_id).execute()
-                    else:
-                        supabase.table('leaderboard').insert(
-                            {"user_id": user_id, "full_name": username, "score": score}).execute()
-                except:
-                    pass
+                # Call internal submit logic to update leaderboard + squads
+                submit_progress_internal(
+                    user_id,
+                    item.get('username', 'Scholar'),
+                    item.get('quiz_score', 0)
+                )
 
         # 3. Sync Saved Resources
         resources_list = guest_data.get('resources', [])
@@ -355,41 +442,64 @@ def save_resource():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/submit_progress', methods=['POST'])
-def submit_progress():
-    data = request.json
-    feedback = data.get('feedback', '')
-    user_id = data.get('user_id')
-    username = data.get('username', 'Anonymous')
-    score = data.get('score', 0)
+# --- UPDATED SUBMIT PROGRESS (SQUAD AWARE) ---
 
-    blob = TextBlob(feedback)
+def submit_progress_internal(user_id, username, score, topic='', node_label='', feedback=''):
     try:
-        supabase.table('node_progress').insert({
-            "user_id": user_id,
-            "topic": data.get('topic', 'General').strip().title(),
-            "node_label": data.get('node_label'),
-            "quiz_score": score,
-            "feedback_text": feedback,
-            "sentiment_score": blob.sentiment.polarity
-        }).execute()
+        # 1. Save Progress Log (if triggered by quiz)
+        if topic:
+            blob = TextBlob(feedback)
+            supabase.table('node_progress').insert({
+                "user_id": user_id,
+                "topic": topic.strip().title(),
+                "node_label": node_label,
+                "quiz_score": score,
+                "feedback_text": feedback,
+                "sentiment_score": blob.sentiment.polarity
+            }).execute()
 
-        try:
-            existing = supabase.table('leaderboard').select(
-                '*').eq('user_id', user_id).execute()
-            if existing.data:
-                new_score = existing.data[0]['score'] + score
-                supabase.table('leaderboard').update(
-                    {"score": new_score, "full_name": username}).eq('user_id', user_id).execute()
-            else:
-                supabase.table('leaderboard').insert(
-                    {"user_id": user_id, "full_name": username, "score": score}).execute()
-        except Exception as lb_error:
-            print(f"Leaderboard Error: {lb_error}")
+        # 2. Update User & SQUAD Score
+        existing = supabase.table('leaderboard').select(
+            '*').eq('user_id', user_id).execute()
+
+        user_squad_id = None
+
+        if existing.data:
+            new_score = existing.data[0]['score'] + score
+            user_squad_id = existing.data[0].get(
+                'squad_id')  # Get their squad ID
+            supabase.table('leaderboard').update(
+                {"score": new_score, "full_name": username}).eq('user_id', user_id).execute()
+        else:
+            supabase.table('leaderboard').insert(
+                {"user_id": user_id, "full_name": username, "score": score}).execute()
+
+        # 🔥 UPDATE SQUAD SCORE 🔥
+        if user_squad_id:
+            squad_data = supabase.table('squads').select(
+                'total_score').eq('id', user_squad_id).execute()
+            if squad_data.data:
+                current_squad_score = squad_data.data[0]['total_score']
+                supabase.table('squads').update(
+                    {"total_score": current_squad_score + score}).eq('id', user_squad_id).execute()
 
         return jsonify({"message": "Saved"})
     except Exception as e:
+        print(f"Leaderboard/Squad Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/submit_progress', methods=['POST'])
+def submit_progress():
+    data = request.json
+    return submit_progress_internal(
+        data.get('user_id'),
+        data.get('username', 'Anonymous'),
+        data.get('score', 0),
+        data.get('topic', ''),
+        data.get('node_label', ''),
+        data.get('feedback', '')
+    )
 
 
 @app.route('/api/leaderboard', methods=['GET'])

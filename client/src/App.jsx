@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import SquadsPage from './pages/SquadsPage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/dashboard" element={<AdminPage />} />
+          <Route path="/squads" element={<SquadsPage />} />
         </Routes>
       </AuthProvider>
     </Router>
