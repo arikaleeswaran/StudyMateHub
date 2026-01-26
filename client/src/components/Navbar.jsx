@@ -2,6 +2,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaTrophy, FaUserShield } from 'react-icons/fa';
 import useMobile from '../hooks/useMobile';
+import { FaShieldAlt } from 'react-icons/fa';
 
 function Navbar() {
   const { user, signOut } = useAuth();
@@ -25,6 +26,7 @@ function Navbar() {
       }}>
         {user ? (
           <>
+            <button onClick={() => navigate('/squads')} style={styles.navButton}><FaShieldAlt size={18} color="#00d2ff" /> {isMobile ? '' : 'Squads'}</button>
             <button onClick={() => navigate('/leaderboard')} style={styles.navButton}><FaTrophy size={18} color="#FFD700" /> {isMobile ? '' : 'Leaderboard'}</button>
             <button onClick={() => navigate('/profile')} style={styles.navButton}><FaUserCircle size={18} /> {isMobile ? '' : 'Dashboard'}</button>
             <button onClick={() => navigate('/admin/login')} style={styles.navButton} title="Admin Panel"><FaUserShield size={18} color="#ff4444" /></button>
