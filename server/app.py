@@ -215,7 +215,7 @@ def get_pdfs(topic, mode='standard', max_results=4):
             pdfs.append(link)
     return pdfs
 
-# --- SQUAD ROUTES (NEW) ---
+# --- SQUAD ROUTES ---
 
 
 @app.route('/api/squad/create', methods=['POST'])
@@ -223,21 +223,14 @@ def create_squad():
     data = request.json
     user_id = data.get('user_id')
     squad_name = data.get('name')
-
-    # Generate random 6-char code
     code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
     try:
-        # 1. Create Squad
         new_squad = supabase.table('squads').insert({
-            "name": squad_name,
-            "join_code": code,
-            "total_score": 0
+            "name": squad_name, "join_code": code, "total_score": 0
         }).execute()
 
         squad_id = new_squad.data[0]['id']
-
-        # 2. Add Creator to Squad
         supabase.table('leaderboard').update(
             {"squad_id": squad_id}).eq("user_id", user_id).execute()
 
@@ -251,20 +244,14 @@ def join_squad():
     data = request.json
     user_id = data.get('user_id')
     code = data.get('code').strip().upper()
-
     try:
-        # 1. Find Squad
         squad = supabase.table('squads').select(
             "*").eq("join_code", code).execute()
         if not squad.data:
             return jsonify({"error": "Invalid Squad Code"}), 404
-
         squad_id = squad.data[0]['id']
-
-        # 2. Update User
         supabase.table('leaderboard').update(
             {"squad_id": squad_id}).eq("user_id", user_id).execute()
-
         return jsonify({"success": True, "squad": squad.data[0]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -274,40 +261,68 @@ def join_squad():
 def get_my_squad():
     user_id = request.args.get('user_id')
     try:
-        # Get user's squad_id
         user_entry = supabase.table('leaderboard').select(
             'squad_id').eq('user_id', user_id).execute()
-
         if not user_entry.data or not user_entry.data[0]['squad_id']:
-            return jsonify(None)  # No squad
-
+            return jsonify(None)
         squad_id = user_entry.data[0]['squad_id']
-
-        # Get Squad Details
         squad_info = supabase.table('squads').select(
             '*').eq('id', squad_id).execute()
-
-        # Get Squad Members
         members = supabase.table('leaderboard').select(
             '*').eq('squad_id', squad_id).order('score', desc=True).execute()
-
-        return jsonify({
-            "details": squad_info.data[0],
-            "members": members.data
-        })
-    except Exception as e:
+        return jsonify({"details": squad_info.data[0], "members": members.data})
+    except:
         return jsonify(None)
 
 
 @app.route('/api/squad/leaderboard', methods=['GET'])
 def get_squad_leaderboard():
     try:
-        # Get Top 10 Squads
         res = supabase.table('squads').select(
             '*').order('total_score', desc=True).limit(10).execute()
         return jsonify(res.data)
     except:
         return jsonify([])
+
+# --- TUTOR CHAT ROUTE (NEW) ---
+
+
+@app.route('/api/chat_node', methods=['POST'])
+def chat_node():
+    data = request.json
+    topic = data.get('topic')
+    node = data.get('node_label')
+    message = data.get('message')
+    history = data.get('history', [])
+
+    system_prompt = f"""
+    You are an expert friendly AI Tutor dedicated to the specific concept: '{node}' (within the broader subject '{topic}').
+    
+    GOAL: Help the user understand THIS concept perfectly.
+    
+    GUIDELINES:
+    1. Be concise (max 3-4 sentences unless code is needed).
+    2. Explain simply, using analogies if helpful.
+    3. If they ask about code, provide a short, clean snippet.
+    4. Stay on topic. If they ask about something else, politely guide them back to '{node}'.
+    """
+
+    messages = [{"role": "system", "content": system_prompt}]
+    # Append limited history (last 4 messages) to keep context but save tokens
+    messages.extend(history[-4:])
+    messages.append({"role": "user", "content": message})
+
+    try:
+        completion = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=400
+        )
+        return jsonify({"reply": completion.choices[0].message.content})
+    except Exception as e:
+        print(f"Chat Error: {e}")
+        return jsonify({"error": "I lost my train of thought. Try again!"}), 500
 
 # --- EXISTING ROUTES ---
 
