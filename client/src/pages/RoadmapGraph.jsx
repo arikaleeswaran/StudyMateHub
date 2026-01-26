@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap, FaArrowDown } from 'react-icons/fa';
+import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap, FaArrowDown, FaRobot } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
+import NodeChatModal from '../components/NodeChatModal'; // ✅ Import Chat Modal
 import Navbar from '../components/Navbar';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +26,7 @@ function RoadmapGraph() {
 
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false); // ✅ Chat State
   const [quizType, setQuizType] = useState('full'); 
   const [checkNode, setCheckNode] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -40,7 +42,6 @@ function RoadmapGraph() {
         setMapLoading(true);
         const params = new URLSearchParams(location.search);
         const mode = params.get('mode') || 'standard';
-        
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
             const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}`);
@@ -55,15 +56,6 @@ function RoadmapGraph() {
             if (data) {
                 const passedNodes = data.filter(d => d.quiz_score >= 3).map(d => d.node_label);
                 setCompletedNodes(new Set(passedNodes));
-            }
-        } else {
-            const guestDataRaw = localStorage.getItem('guest_data');
-            if (guestDataRaw) {
-                const guestData = JSON.parse(guestDataRaw);
-                const passedGuest = guestData.progress
-                    .filter(p => p.topic === topic && p.quiz_score >= 3)
-                    .map(p => p.node_label);
-                setCompletedNodes(new Set(passedGuest));
             }
         }
         setMapLoading(false);
@@ -80,21 +72,8 @@ function RoadmapGraph() {
 
   const showNotification = (msg, type='success') => { setToast({ show: true, message: msg, type }); };
 
-  const saveToLocalGuest = (key, data) => {
-    const existing = JSON.parse(localStorage.getItem('guest_data') || '{"roadmap": null, "progress": [], "resources": []}');
-    if (key === 'roadmap') existing.roadmap = data;
-    else if (key === 'progress') existing.progress.push(data);
-    else if (key === 'resources') existing.resources.push(data);
-    localStorage.setItem('guest_data', JSON.stringify(existing));
-  };
-
   const handleSaveRoadmap = async () => {
-    if (!user) { 
-        saveToLocalGuest('roadmap', { topic: topic, graph_data: { nodes: nodes } });
-        showNotification("⚠️ Saved locally! Login to save permanently.", "warning");
-        setTimeout(() => navigate('/auth'), 2000); 
-        return; 
-    }
+    if (!user) { navigate('/auth'); return; }
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_roadmap`, { user_id: user.id, topic: topic, graph_data: { nodes: nodes } });
@@ -103,21 +82,11 @@ function RoadmapGraph() {
   };
 
   const handleSaveResource = async (item, type) => {
-    const resourceData = {
-        roadmap_topic: topic, node_label: selectedNode.label, resource_type: type, 
-        title: item.title, url: item.url, thumbnail: item.thumbnail || ''
-    };
-
-    if (!user) {
-        saveToLocalGuest('resources', resourceData);
-        showNotification("Saved to guest library! 📚 (Login to keep)", "warning");
-        return;
-    }
-
+    if (!user) return showNotification("Login required to save", "error");
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         await axios.post(`${baseUrl}/api/save_resource`, {
-            user_id: user.id, ...resourceData
+            user_id: user.id, roadmap_topic: topic, node_label: selectedNode.label, resource_type: type, title: item.title, url: item.url, thumbnail: item.thumbnail || ''
         });
         showNotification("Resource added to Library! 📚");
     } catch(e) { showNotification("Error saving resource", "error"); }
@@ -133,36 +102,25 @@ function RoadmapGraph() {
   const handleStartFullAssessment = () => { setQuizType('full'); setShowQuizModal(true); };
   const handleUpgradeToFull = () => { setQuizType('full'); };
 
-  // --- NEW: Calculate History ---
-  const getHistoryParams = () => {
-    if (!checkNode || nodes.length === 0) return "";
-    const currentIndex = nodes.findIndex(n => n.id === checkNode.id);
-    if (currentIndex <= 0) return ""; 
-    const prevNodes = nodes.slice(Math.max(0, currentIndex - 4), currentIndex).map(n => n.label);
-    return prevNodes.join(", ");
-  };
-
   const handleQuizComplete = async (score, feedback) => {
     setShowQuizModal(false);
-    const progressData = {
-        topic: topic, node_label: checkNode.label, quiz_score: score, feedback_text: feedback, sentiment_score: 0 
-    };
-
     if(user) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
             await axios.post(`${baseUrl}/api/submit_progress`, { 
-                user_id: user.id, username: user.user_metadata?.full_name || user.email.split('@')[0], ...progressData
+                user_id: user.id, 
+                username: user.user_metadata?.full_name || user.email.split('@')[0],
+                topic: topic, 
+                node_label: checkNode.label, 
+                score: score, 
+                feedback: feedback 
             });
         } catch(e) { console.error(e); }
-    } else {
-        saveToLocalGuest('progress', progressData);
     }
-
     let passed = quizType === 'diagnostic' ? score >= 3 : score >= 6; 
     if (passed) {
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
-        showNotification(user ? "🎉 Module Passed! Unlocked next step." : "🎉 Guest: Module Passed! (Login to save)");
+        showNotification("🎉 Module Passed! Unlocked next step.");
     } else {
         if (quizType === 'diagnostic') fetchResources(checkNode); 
         else showNotification("Keep studying! Try again later.", "error");
@@ -204,6 +162,7 @@ function RoadmapGraph() {
 
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
+      {/* Header */}
       <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
             <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center', fontSize: isMobile ? '1.5rem' : '2rem' }}>
@@ -217,15 +176,20 @@ function RoadmapGraph() {
         </div>
       </div>
 
+      {/* Graph */}
       <div style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {rows.map((row, rowIndex) => {
           const isEvenRow = rowIndex % 2 === 0;
           return (
             <div key={rowIndex} style={{ position: 'relative', width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ 
-                    display: 'flex', justifyContent: 'center', gap: isMobile ? '20px' : '60px', 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    gap: isMobile ? '20px' : '60px', 
                     flexDirection: isMobile ? 'column' : (isEvenRow ? 'row' : 'row-reverse'), 
-                    alignItems: 'center', padding: '30px 0', zIndex: 2 
+                    alignItems: 'center',
+                    padding: '30px 0', 
+                    zIndex: 2 
                 }}>
                     {row.map((node, i) => {
                         const globalIndex = rowIndex * chunkSize + i;
@@ -242,10 +206,13 @@ function RoadmapGraph() {
                                         borderRadius: '50%',
                                         background: isCompleted ? 'rgba(40, 167, 69, 0.2)' : isSelected ? 'rgba(0, 210, 255, 0.2)' : 'rgba(255,255,255,0.05)',
                                         border: isLocked ? '3px solid #555' : isCompleted ? '3px solid #28a745' : isSelected ? '3px solid #00d2ff' : '3px solid rgba(255,255,255,0.2)',
-                                        color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-                                        padding: '15px', textAlign: 'center', cursor: isLocked ? 'not-allowed' : 'pointer',
+                                        color: 'white',
+                                        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                                        padding: '15px', textAlign: 'center', 
+                                        cursor: isLocked ? 'not-allowed' : 'pointer',
                                         boxShadow: isSelected ? '0 0 20px rgba(0,210,255,0.4)' : 'none',
-                                        transition: 'all 0.3s ease', position: 'relative', wordBreak: 'break-word', overflow: 'hidden'
+                                        transition: 'all 0.3s ease', position: 'relative',
+                                        wordBreak: 'break-word', overflow: 'hidden'
                                     }}
                                 >
                                     {isLocked ? <FaLock size={20} color="#777" style={{marginBottom:'8px'}}/> : 
@@ -256,7 +223,9 @@ function RoadmapGraph() {
                                 </div>
                                 {i < row.length - 1 && (
                                     <div style={{
-                                        margin: isMobile ? '10px 0' : '0 20px', fontSize: '24px', color: isCompleted ? '#28a745' : '#555'
+                                        margin: isMobile ? '10px 0' : '0 20px', 
+                                        fontSize: '24px', 
+                                        color: isCompleted ? '#28a745' : '#555'
                                     }}>
                                         {isMobile ? <FaArrowDown/> : (isEvenRow ? <FaArrowRight/> : <FaArrowLeft/>)}
                                     </div>
@@ -271,9 +240,11 @@ function RoadmapGraph() {
         })}
       </div>
 
+      {/* Resources Section */}
       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '50px 20px', borderTop: '2px solid rgba(255,255,255,0.1)', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+                
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', flexWrap:'wrap', gap:'15px'}}>
                     <div style={{display:'flex', alignItems:'center', gap:'10px', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center'}}>
                         <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
@@ -291,23 +262,33 @@ function RoadmapGraph() {
                             </div>
                         )}
                     </div>
-                    {!completedNodes.has(selectedNode.label) && (
-                        <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', width: isMobile ? '100%' : 'auto', justifyContent: 'center'}}>
-                            <FaGraduationCap size={24}/> Take Assessment
+                    <div style={{display:'flex', gap:'10px'}}>
+                        {/* ✅ NEW: CHAT BUTTON */}
+                        <button onClick={() => setShowChatModal(true)} style={{padding:'15px 30px', background:'#00d2ff', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px'}}>
+                            <FaRobot size={24}/> Ask AI
                         </button>
-                    )}
+
+                        {!completedNodes.has(selectedNode.label) && (
+                            <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', width: isMobile ? '100%' : 'auto', justifyContent: 'center'}}>
+                                <FaGraduationCap size={24}/> Take Assessment
+                            </button>
+                        )}
+                    </div>
                 </div>
                 
                 {loadingResources ? <div className="spinner"></div> : (
                     <div style={{display:'flex', gap:'30px', flexWrap:'wrap', flexDirection: isMobile ? 'column' : 'row'}}>
+                        {/* Videos */}
                         <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
                             <h3 style={{borderBottom:'2px solid #ff6b6b', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaPlayCircle color="#ff6b6b"/> Videos</h3>
                             <div style={{display:'grid', gap:'15px'}}>{resources.videos.map((v, i) => (<div key={i} style={{display:'flex', gap:'10px', alignItems:'center'}}><a href={v.url} target="_blank" rel="noreferrer" style={{display:'flex', gap:'10px', textDecoration:'none', color:'white', width:'100%'}}><img src={v.thumbnail} style={{width:'80px', height:'60px', borderRadius:'5px', objectFit:'cover'}} /><div style={{flex:1}}><div style={{fontSize:'0.9rem', fontWeight:'bold', lineHeight:'1.2'}}>{v.title.slice(0, 50)}...</div><div style={{fontSize:'0.8rem', color:'#aaa'}}>{v.channel}</div></div></a><button onClick={() => handleSaveResource(v, 'video')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
+                        {/* Articles */}
                         <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
                              <h3 style={{borderBottom:'2px solid #4caf50', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaGlobe color="#4caf50"/> Articles</h3>
                              <div style={{display:'grid', gap:'10px'}}>{resources.articles?.map((a, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={a.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'1.2rem'}}>📄</span><div style={{fontWeight:'bold', fontSize:'0.95rem'}}>{a.title}</div></a><button onClick={() => handleSaveResource(a, 'article')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
                         </div>
+                        {/* PDFs */}
                         <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
                              <h3 style={{borderBottom:'2px solid #ffc107', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaFilePdf color="#ffc107"/> Cheat Sheets</h3>
                              <div style={{display:'grid', gap:'10px'}}>{resources.pdfs.map((p, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={p.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><FaFilePdf color="#dc3545"/><span style={{fontSize:'0.9rem', fontWeight:'500'}}>{p.title}</span></a><button onClick={() => handleSaveResource(p, 'pdf')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
@@ -324,12 +305,20 @@ function RoadmapGraph() {
         <AssessmentModal 
             mainTopic={topic} 
             subTopic={checkNode.label} 
-            history={getHistoryParams()} // ✅ History passed here
             questionCount={quizType === 'diagnostic' ? 5 : 10}
             onClose={() => setShowQuizModal(false)} 
             onComplete={handleQuizComplete} 
             onRetry={handleUpgradeToFull} 
         />
+      )}
+
+      {/* ✅ NEW: CHAT MODAL */}
+      {showChatModal && selectedNode && (
+          <NodeChatModal 
+            mainTopic={topic}
+            subTopic={selectedNode.label}
+            onClose={() => setShowChatModal(false)}
+          />
       )}
     </div>
   );
