@@ -4,7 +4,7 @@ import axios from 'axios';
 import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, FaCheckCircle, FaLock, FaGraduationCap, FaArrowDown, FaRobot } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
-import NodeChatModal from '../components/NodeChatModal'; // ✅ Import Chat Modal
+import NodeChatModal from '../components/NodeChatModal'; 
 import Navbar from '../components/Navbar';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ function RoadmapGraph() {
   const isMobile = useMobile(); 
   
   const [nodes, setNodes] = useState([]);
+  const [flashcards, setFlashcards] = useState([]); // ✅ NEW
   const [selectedNode, setSelectedNode] = useState(null);
   const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 });
   const [completedNodes, setCompletedNodes] = useState(new Set());
@@ -26,7 +27,7 @@ function RoadmapGraph() {
 
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
-  const [showChatModal, setShowChatModal] = useState(false); // ✅ Chat State
+  const [showChatModal, setShowChatModal] = useState(false);
   const [quizType, setQuizType] = useState('full'); 
   const [checkNode, setCheckNode] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -48,6 +49,10 @@ function RoadmapGraph() {
             const data = res.data;
             if (data && data.nodes) setNodes(data.nodes);
             else setNodes([{id:'1', label:`${topic} Basics`}]);
+            
+            // ✅ Capture Flashcards
+            if (data.flashcards) setFlashcards(data.flashcards);
+
             if (mode === 'panic') showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
         } catch(e) { console.error(e); }
 
@@ -76,8 +81,13 @@ function RoadmapGraph() {
     if (!user) { navigate('/auth'); return; }
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        await axios.post(`${baseUrl}/api/save_roadmap`, { user_id: user.id, topic: topic, graph_data: { nodes: nodes } });
-        showNotification("Roadmap saved successfully!");
+        await axios.post(`${baseUrl}/api/save_roadmap`, { 
+            user_id: user.id, 
+            topic: topic, 
+            graph_data: { nodes: nodes },
+            flashcards: flashcards // ✅ Save Flashcards
+        });
+        showNotification("Roadmap & Flashcards saved!");
     } catch (e) { showNotification("Error saving roadmap", "error"); }
   };
 
@@ -263,7 +273,6 @@ function RoadmapGraph() {
                         )}
                     </div>
                     <div style={{display:'flex', gap:'10px'}}>
-                        {/* ✅ NEW: CHAT BUTTON */}
                         <button onClick={() => setShowChatModal(true)} style={{padding:'15px 30px', background:'#00d2ff', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px'}}>
                             <FaRobot size={24}/> Ask AI
                         </button>
@@ -312,7 +321,6 @@ function RoadmapGraph() {
         />
       )}
 
-      {/* ✅ NEW: CHAT MODAL */}
       {showChatModal && selectedNode && (
           <NodeChatModal 
             mainTopic={topic}

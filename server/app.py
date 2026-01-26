@@ -5,6 +5,7 @@ import requests
 import urllib.parse
 import random
 import string
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -223,14 +224,21 @@ def create_squad():
     data = request.json
     user_id = data.get('user_id')
     squad_name = data.get('name')
+
+    # Generate random 6-char code
     code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
     try:
+        # 1. Create Squad
         new_squad = supabase.table('squads').insert({
-            "name": squad_name, "join_code": code, "total_score": 0
+            "name": squad_name,
+            "join_code": code,
+            "total_score": 0
         }).execute()
 
         squad_id = new_squad.data[0]['id']
+
+        # 2. Add Creator to Squad
         supabase.table('leaderboard').update(
             {"squad_id": squad_id}).eq("user_id", user_id).execute()
 
@@ -244,14 +252,20 @@ def join_squad():
     data = request.json
     user_id = data.get('user_id')
     code = data.get('code').strip().upper()
+
     try:
+        # 1. Find Squad
         squad = supabase.table('squads').select(
             "*").eq("join_code", code).execute()
         if not squad.data:
             return jsonify({"error": "Invalid Squad Code"}), 404
+
         squad_id = squad.data[0]['id']
+
+        # 2. Update User
         supabase.table('leaderboard').update(
             {"squad_id": squad_id}).eq("user_id", user_id).execute()
+
         return jsonify({"success": True, "squad": squad.data[0]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -261,30 +275,42 @@ def join_squad():
 def get_my_squad():
     user_id = request.args.get('user_id')
     try:
+        # Get user's squad_id
         user_entry = supabase.table('leaderboard').select(
             'squad_id').eq('user_id', user_id).execute()
+
         if not user_entry.data or not user_entry.data[0]['squad_id']:
-            return jsonify(None)
+            return jsonify(None)  # No squad
+
         squad_id = user_entry.data[0]['squad_id']
+
+        # Get Squad Details
         squad_info = supabase.table('squads').select(
             '*').eq('id', squad_id).execute()
+
+        # Get Squad Members
         members = supabase.table('leaderboard').select(
             '*').eq('squad_id', squad_id).order('score', desc=True).execute()
-        return jsonify({"details": squad_info.data[0], "members": members.data})
-    except:
+
+        return jsonify({
+            "details": squad_info.data[0],
+            "members": members.data
+        })
+    except Exception as e:
         return jsonify(None)
 
 
 @app.route('/api/squad/leaderboard', methods=['GET'])
 def get_squad_leaderboard():
     try:
+        # Get Top 10 Squads
         res = supabase.table('squads').select(
             '*').order('total_score', desc=True).limit(10).execute()
         return jsonify(res.data)
     except:
         return jsonify([])
 
-# --- TUTOR CHAT ROUTE (NEW) ---
+# --- TUTOR CHAT ROUTE ---
 
 
 @app.route('/api/chat_node', methods=['POST'])
@@ -324,7 +350,52 @@ def chat_node():
         print(f"Chat Error: {e}")
         return jsonify({"error": "I lost my train of thought. Try again!"}), 500
 
-# --- EXISTING ROUTES ---
+# --- FLASHCARD ROUTES ---
+
+
+@app.route('/api/flashcards/due', methods=['GET'])
+def get_due_flashcards():
+    user_id = request.args.get('user_id')
+    try:
+        # Fetch cards where next_review is in the past (or now)
+        now = datetime.utcnow().isoformat()
+        res = supabase.table('user_flashcards').select(
+            '*').eq('user_id', user_id).lte('next_review', now).limit(20).execute()
+        return jsonify(res.data)
+    except Exception as e:
+        return jsonify([])
+
+
+@app.route('/api/flashcards/review', methods=['POST'])
+def review_flashcard():
+    data = request.json
+    card_id = data.get('card_id')
+    # 'easy' (2x), 'medium' (1.5x), 'hard' (1x/reset)
+    quality = data.get('quality')
+    current_interval = data.get('current_interval', 1)
+
+    try:
+        new_interval = 1
+        if quality == 'easy':
+            new_interval = max(1, current_interval * 2)
+        elif quality == 'medium':
+            new_interval = max(1, int(current_interval * 1.5))
+        elif quality == 'hard':
+            new_interval = 1
+
+        next_date = (datetime.utcnow() +
+                     timedelta(days=new_interval)).isoformat()
+
+        supabase.table('user_flashcards').update({
+            "next_review": next_date,
+            "interval_days": new_interval
+        }).eq('id', card_id).execute()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- CORE APP ROUTES ---
 
 
 @app.route('/api/admin/login', methods=['POST'])
@@ -428,12 +499,29 @@ def get_recommendations():
 @app.route('/api/save_roadmap', methods=['POST'])
 def save_roadmap():
     data = request.json
+    user_id = data.get('user_id')
+    topic = data.get('topic', '').strip().title()
+    flashcards = data.get('flashcards', [])
+
     try:
+        # 1. Save Roadmap
         supabase.table('user_roadmaps').upsert({
-            "user_id": data.get('user_id'),
-            "topic": data.get('topic', '').strip().title(),
+            "user_id": user_id,
+            "topic": topic,
             "graph_data": data.get('graph_data')
         }).execute()
+
+        # 2. Save Flashcards (if any)
+        if flashcards:
+            for card in flashcards:
+                supabase.table('user_flashcards').insert({
+                    "user_id": user_id,
+                    "topic": topic,
+                    "front": card['front'],
+                    "back": card['back'],
+                    "interval_days": 1
+                }).execute()
+
         return jsonify({"message": "Saved"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -456,8 +544,8 @@ def save_resource():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 # --- UPDATED SUBMIT PROGRESS (SQUAD AWARE) ---
+
 
 def submit_progress_internal(user_id, username, score, topic='', node_label='', feedback=''):
     try:
@@ -541,28 +629,34 @@ def get_roadmap():
         except:
             pass
 
-    if mode == 'panic':
-        prompt = f"""
-        The user has an EXAM TOMORROW on '{topic}'. 
-        Create a customized 'Crash Course' learning path in English with exactly 4 steps.
-        Focus ONLY on the high-yield, most critical concepts that appear in exams.
-        Skip the history/intro. Go straight to the hard/important stuff.
-        Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Core Concept 1"}}, ... ] }}
-        """
-    else:
-        prompt = f"""
-        Create a comprehensive, linear 7-step learning path for '{topic}' in English.
-        Start from basics and progress to advanced.
-        Return strict JSON: {{ "nodes": [ {{"id": "1", "label": "Basics"}}, ... ] }}
-        """
+    # UPDATED PROMPT: Request Flashcards alongside Nodes
+    prompt = f"""
+    Create a learning path for '{topic}' ({mode} mode).
+    Format: JSON Object with two keys: 'nodes' and 'flashcards'.
+    
+    1. 'nodes': List of {4 if mode == 'panic' else 7} steps (id, label).
+    2. 'flashcards': List of EXACTLY 5 key terms/definitions from this topic.
+       Format: {{ "front": "Term", "back": "Short Definition" }}
+    
+    Return strict JSON.
+    """
 
     try:
         completion = groq_client.chat.completions.create(model=GROQ_MODEL, messages=[
                                                          {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
         data = parse_json_safely(completion.choices[0].message.content, "dict")
-        return jsonify(data if data else {"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
+
+        # Fallbacks if AI fails one part
+        if not data:
+            data = {}
+        if 'nodes' not in data:
+            data['nodes'] = [{"id": "1", "label": f"{topic} Basics"}]
+        if 'flashcards' not in data:
+            data['flashcards'] = []
+
+        return jsonify(data)
     except:
-        return jsonify({"nodes": [{"id": "1", "label": f"{topic} Basics"}]})
+        return jsonify({"nodes": [{"id": "1", "label": f"{topic} Basics"}], "flashcards": []})
 
 
 @app.route('/api/quiz', methods=['GET'])
