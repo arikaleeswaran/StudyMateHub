@@ -85,7 +85,7 @@ def get_youtube_videos(topic, mode='standard', max_results=5):
     search_term = get_smart_search_term(topic)
 
     if mode == 'panic':
-        query = f"{search_term} crash course in 10 minutes"
+        query = f"{search_term} crash course in 20 minutes"
     else:
         query = f"{search_term} tutorial"
 
