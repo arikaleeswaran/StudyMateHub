@@ -6,6 +6,7 @@ import axios from 'axios';
 import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo, FaExclamationTriangle, FaUserFriends, FaFire, FaPlus } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import FlashcardModal from '../components/FlashcardModal'; // ✅ Import
 import Navbar from '../components/Navbar'; 
 import useMobile from '../hooks/useMobile';
 
@@ -23,8 +24,11 @@ function ProfilePage() {
   const [activeTab, setActiveTab] = useState('library');
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState([]);
+  
+  // ✅ Flashcard States
+  const [dueFlashcards, setDueFlashcards] = useState([]);
+  const [showFlashcards, setShowFlashcards] = useState(false);
 
-  // ... (Keep existing state and functions logic exactly the same) ...
   const [showQuiz, setShowQuiz] = useState(false);
   const [activeQuizData, setActiveQuizData] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null, title: '' });
@@ -60,9 +64,14 @@ function ProfilePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         const roadmaps = await supabase.from('user_roadmaps').select('*').eq('user_id', user.id);
         const resources = await supabase.from('saved_resources').select('*').eq('user_id', user.id);
         const scores = await supabase.from('node_progress').select('*').eq('user_id', user.id).order('created_at', {ascending: false});
+
+        // ✅ Fetch Due Flashcards
+        const fcRes = await axios.get(`${baseUrl}/api/flashcards/due?user_id=${user.id}`);
+        setDueFlashcards(fcRes.data);
 
         setAllScores(scores.data || []);
         setUserRoadmaps(roadmaps.data || []);
@@ -94,6 +103,15 @@ function ProfilePage() {
         setFolders(grouped);
     } catch (error) { console.error("Error:", error); } 
     finally { setLoading(false); }
+  };
+
+  // ✅ Handle Flashcard Review
+  const handleReviewUpdate = async (cardId, quality, currentInterval) => {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+      await axios.post(`${baseUrl}/api/flashcards/review`, {
+          card_id: cardId, quality, current_interval: currentInterval
+      });
+      setDueFlashcards(prev => prev.filter(c => c.id !== cardId));
   };
 
   const handleRetake = (mainTopic, subTopic) => {
@@ -179,7 +197,7 @@ function ProfilePage() {
           
           <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
              <h1 style={{ margin: 0, fontSize: isMobile ? '2rem' : '2.5rem', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                👋 Hi, {userName}!
+               👋 Hi, {userName}!
              </h1>
              <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
                 <div style={{ padding: '5px 15px', background: rank.color, color: 'white', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '5px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
@@ -192,6 +210,29 @@ function ProfilePage() {
           </div>
           <p style={{ color: '#94a3b8', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
         </div>
+
+        {/* ✅ FLASHCARDS ALERT SECTION */}
+        {dueFlashcards.length > 0 && (
+            <div style={{
+                background: 'linear-gradient(45deg, #FF6B6B, #FF8E53)', 
+                padding: '20px', borderRadius: '15px', marginBottom: '30px', 
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white',
+                boxShadow: '0 4px 15px rgba(255, 107, 107, 0.3)'
+            }}>
+                <div>
+                    <h3 style={{margin:0, fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'10px'}}>
+                        <FaFire/> Daily Review
+                    </h3>
+                    <p style={{margin:'5px 0 0 0', opacity:0.9}}>You have {dueFlashcards.length} cards due for review.</p>
+                </div>
+                <button onClick={() => setShowFlashcards(true)} style={{
+                    background: 'white', color: '#FF6B6B', border: 'none', padding: '10px 25px', 
+                    borderRadius: '30px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+                }}>
+                    Start Review
+                </button>
+            </div>
+        )}
 
         {/* Recommendations */}
         {recommendations.length > 0 && (
@@ -266,51 +307,51 @@ function ProfilePage() {
 
                                 {expandedFolders[key] && (
                                     <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)' }}>
-                                        {folder.hasRoadmap && (
-                                            <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', width: isMobile ? '100%' : 'auto'}}>View Map 🗺️</button>
-                                        )}
+                                            {folder.hasRoadmap && (
+                                                <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', width: isMobile ? '100%' : 'auto'}}>View Map 🗺️</button>
+                                            )}
 
-                                        {Object.keys(folder.subfolders).map(subNode => {
-                                            const status = getNodeStatus(folder.displayTitle, subNode);
-                                            return (
-                                                <div key={subNode} style={{ marginLeft: isMobile ? '0' : '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
-                                                    <h4 style={{ margin: '0 0 10px 0', color: 'white', display:'flex', alignItems:'center', gap:'10px' }}>
-                                                      {status.hasPassed ? <FaCheckCircle color="#28a745"/> : <span style={{width:'16px'}}></span>}
-                                                      {subNode}
-                                                      {status.isWeak && (
-                                                          <span style={{fontSize:'0.75rem', background:'rgba(255, 107, 107, 0.2)', color:'#ff6b6b', padding:'4px 8px', borderRadius:'12px', border:'1px solid rgba(255, 107, 107, 0.3)', display:'flex', alignItems:'center', gap:'5px'}}>
-                                                              <FaExclamationTriangle/> Weak Zone
-                                                          </span>
-                                                      )}
-                                                    </h4>
-                                                    
-                                                    {folder.subfolders[subNode].scores.map((s, i) => (
-                                                        <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
-                                                          <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)', color: s.quiz_score >=6 ? '#28a745' : '#ffc107', borderRadius:'15px', fontSize:'0.8rem', border: s.quiz_score>=6?'1px solid rgba(40,167,69,0.3)':'1px solid rgba(255,193,7,0.3)'}}>
-                                                              <FaStar/> Score: {s.quiz_score}/10
-                                                          </div>
-                                                          <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'5px', background:'rgba(255,255,255,0.05)', color:'white', display:'flex', alignItems:'center', gap:'4px'}}>
-                                                              <FaRedo size={10}/> Retake
-                                                          </button>
-                                                        </div>
-                                                    ))}
-
-                                                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
-                                                        {folder.subfolders[subNode].resources.map(res => (
-                                                            <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px'}}>
-                                                                <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
-                                                                    {res.resource_type === 'video' ? <FaVideo color="#ff6b6b"/> : res.resource_type === 'article' ? <FaGlobe color="#4caf50"/> : <FaFilePdf color="#ffc107"/>}
-                                                                    <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
-                                                                </a>
-                                                                <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', padding:'0 5px'}}>
-                                                                    <FaTrash size={12}/>
-                                                                </button>
+                                            {Object.keys(folder.subfolders).map(subNode => {
+                                                const status = getNodeStatus(folder.displayTitle, subNode);
+                                                return (
+                                                    <div key={subNode} style={{ marginLeft: isMobile ? '0' : '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
+                                                        <h4 style={{ margin: '0 0 10px 0', color: 'white', display:'flex', alignItems:'center', gap:'10px' }}>
+                                                          {status.hasPassed ? <FaCheckCircle color="#28a745"/> : <span style={{width:'16px'}}></span>}
+                                                          {subNode}
+                                                          {status.isWeak && (
+                                                              <span style={{fontSize:'0.75rem', background:'rgba(255, 107, 107, 0.2)', color:'#ff6b6b', padding:'4px 8px', borderRadius:'12px', border:'1px solid rgba(255, 107, 107, 0.3)', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                                  <FaExclamationTriangle/> Weak Zone
+                                                              </span>
+                                                          )}
+                                                        </h4>
+                                                        
+                                                        {folder.subfolders[subNode].scores.map((s, i) => (
+                                                            <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
+                                                              <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)', color: s.quiz_score >=6 ? '#28a745' : '#ffc107', borderRadius:'15px', fontSize:'0.8rem', border: s.quiz_score>=6?'1px solid rgba(40,167,69,0.3)':'1px solid rgba(255,193,7,0.3)'}}>
+                                                                  <FaStar/> Score: {s.quiz_score}/10
+                                                              </div>
+                                                              <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'5px', background:'rgba(255,255,255,0.05)', color:'white', display:'flex', alignItems:'center', gap:'4px'}}>
+                                                                  <FaRedo size={10}/> Retake
+                                                              </button>
                                                             </div>
                                                         ))}
+
+                                                        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
+                                                            {folder.subfolders[subNode].resources.map(res => (
+                                                                <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px'}}>
+                                                                    <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
+                                                                            {res.resource_type === 'video' ? <FaVideo color="#ff6b6b"/> : res.resource_type === 'article' ? <FaGlobe color="#4caf50"/> : <FaFilePdf color="#ffc107"/>}
+                                                                            <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
+                                                                    </a>
+                                                                    <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', padding:'0 5px'}}>
+                                                                            <FaTrash size={12}/>
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
                                     </div>
                                 )}
                             </div>
@@ -329,11 +370,11 @@ function ProfilePage() {
                                         <span style={{fontSize:'0.9rem', color:'#aaa', background:'rgba(255,255,255,0.1)', padding:'2px 8px', borderRadius:'4px'}}>{score.topic || "Unknown Topic"}</span>
                                     </div>
                                     <div style={{textAlign:'right', display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'5px'}}>
-                                        <h2 style={{margin:0, color: score.quiz_score >=6 ? '#28a745' : '#ffc107'}}>{score.quiz_score}/10</h2>
-                                        
-                                        <button onClick={() => handleRetake(score.topic, score.node_label)} style={{padding:'5px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
-                                            <FaRedo/> Retake
-                                        </button>
+                                            <h2 style={{margin:0, color: score.quiz_score >=6 ? '#28a745' : '#ffc107'}}>{score.quiz_score}/10</h2>
+                                            
+                                            <button onClick={() => handleRetake(score.topic, score.node_label)} style={{padding:'5px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                <FaRedo/> Retake
+                                            </button>
                                     </div>
                                 </div>
                             ))}
@@ -361,6 +402,16 @@ function ProfilePage() {
             onComplete={handleQuizComplete}
           />
       )}
+
+      {/* ✅ FLASHCARD MODAL */}
+      {showFlashcards && dueFlashcards.length > 0 && (
+          <FlashcardModal 
+            cards={dueFlashcards} 
+            onClose={() => setShowFlashcards(false)} 
+            onReviewUpdate={handleReviewUpdate}
+          />
+      )}
+
       <style>{`
         @keyframes popIn {
           from { transform: scale(0); opacity: 0; }
