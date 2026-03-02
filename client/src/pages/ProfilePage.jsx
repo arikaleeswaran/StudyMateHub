@@ -6,14 +6,14 @@ import axios from 'axios';
 import { FaFolder, FaFolderOpen, FaArrowLeft, FaVideo, FaFilePdf, FaStar, FaChevronRight, FaChevronDown, FaChartBar, FaBook, FaGlobe, FaTrash, FaCheckCircle, FaRunning, FaRedo, FaExclamationTriangle, FaUserFriends, FaFire, FaPlus } from 'react-icons/fa';
 import AssessmentModal from '../components/AssessmentModal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import FlashcardModal from '../components/FlashcardModal'; // ✅ Import
+import FlashcardModal from '../components/FlashcardModal'; 
 import Navbar from '../components/Navbar'; 
 import useMobile from '../hooks/useMobile';
 
 function ProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isMobile = useMobile(); // ✅ Hook
+  const isMobile = useMobile(); 
   
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Scholar";
 
@@ -25,12 +25,12 @@ function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState([]);
   
-  // ✅ Flashcard States
   const [dueFlashcards, setDueFlashcards] = useState([]);
   const [showFlashcards, setShowFlashcards] = useState(false);
 
   const [showQuiz, setShowQuiz] = useState(false);
   const [activeQuizData, setActiveQuizData] = useState(null);
+  // ✅ UPDATED: Delete confirm now stores the specific ID
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: null, id: null, title: '' });
 
   useEffect(() => {
@@ -69,7 +69,6 @@ function ProfilePage() {
         const resources = await supabase.from('saved_resources').select('*').eq('user_id', user.id);
         const scores = await supabase.from('node_progress').select('*').eq('user_id', user.id).order('created_at', {ascending: false});
 
-        // ✅ Fetch Due Flashcards
         const fcRes = await axios.get(`${baseUrl}/api/flashcards/due?user_id=${user.id}`);
         setDueFlashcards(fcRes.data);
 
@@ -79,15 +78,21 @@ function ProfilePage() {
         const grouped = {};
         const normalize = (str) => str ? str.trim().toLowerCase() : "unknown";
 
+        // ✅ UPDATED GROUPING: Group roadmaps by topic, but store multiple modes
         roadmaps.data?.forEach(r => {
             const key = normalize(r.topic); 
-            if (!grouped[key]) grouped[key] = { displayTitle: r.topic, hasRoadmap: true, subfolders: {} };
-            else grouped[key].hasRoadmap = true;
+            if (!grouped[key]) {
+                grouped[key] = { displayTitle: r.topic, roadmaps: [], resourcesCount: 0, subfolders: {} };
+            }
+            grouped[key].roadmaps.push(r);
         });
 
         resources.data?.forEach(r => {
             const key = normalize(r.roadmap_topic);
-            if (!grouped[key]) grouped[key] = { displayTitle: r.roadmap_topic, hasRoadmap: false, subfolders: {} };
+            if (!grouped[key]) grouped[key] = { displayTitle: r.roadmap_topic, roadmaps: [], resourcesCount: 0, subfolders: {} };
+            
+            grouped[key].resourcesCount += 1;
+            
             if (!grouped[key].subfolders[r.node_label]) grouped[key].subfolders[r.node_label] = { resources: [], scores: [] };
             grouped[key].subfolders[r.node_label].resources.push(r);
         });
@@ -95,7 +100,7 @@ function ProfilePage() {
         scores.data?.forEach(s => {
             const key = normalize(s.topic); 
             if (key) {
-                if (!grouped[key]) grouped[key] = { displayTitle: s.topic, hasRoadmap: false, subfolders: {} };
+                if (!grouped[key]) grouped[key] = { displayTitle: s.topic, roadmaps: [], resourcesCount: 0, subfolders: {} };
                 if (!grouped[key].subfolders[s.node_label]) grouped[key].subfolders[s.node_label] = { resources: [], scores: [] };
                 grouped[key].subfolders[s.node_label].scores.push(s);
             }
@@ -105,7 +110,6 @@ function ProfilePage() {
     finally { setLoading(false); }
   };
 
-  // ✅ Handle Flashcard Review
   const handleReviewUpdate = async (cardId, quality, currentInterval) => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
       await axios.post(`${baseUrl}/api/flashcards/review`, {
@@ -136,15 +140,20 @@ function ProfilePage() {
       } catch(e) { console.error(e); }
   };
   
-  const handleDeleteRoadmap = (topic) => { setDeleteConfirm({ show: true, type: 'roadmap', id: topic, title: topic }); };
+  // ✅ UPDATED: Delete now passes the specific Roadmap ID
+  const handleDeleteRoadmap = (id, topic, mode) => { setDeleteConfirm({ show: true, type: 'roadmap', id: id, title: `${mode} roadmap for ${topic}` }); };
   const handleDeleteResource = (id) => { setDeleteConfirm({ show: true, type: 'resource', id: id, title: 'this resource' }); };
 
   const executeDelete = async () => {
       setDeleteConfirm(prev => ({ ...prev, show: false }));
       try {
           const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-          if (deleteConfirm.type === 'roadmap') await axios.delete(`${baseUrl}/api/delete_roadmap?user_id=${user.id}&topic=${deleteConfirm.id}`);
-          else await axios.delete(`${baseUrl}/api/delete_resource?id=${deleteConfirm.id}`);
+          // ✅ UPDATED: Delete hits supabase directly using the ID we passed to the modal
+          if (deleteConfirm.type === 'roadmap') {
+              await supabase.from('user_roadmaps').delete().eq('id', deleteConfirm.id);
+          } else {
+              await axios.delete(`${baseUrl}/api/delete_resource?id=${deleteConfirm.id}`);
+          }
           fetchData(); 
       } catch(e) { alert("Error deleting."); }
   };
@@ -157,21 +166,20 @@ function ProfilePage() {
       return { isWeak: failCount >= 2, failCount, hasPassed };
   };
 
-  const getProgress = (topicKey) => {
+  // ✅ UPDATED: Calculate progress for a specific roadmap mode
+  const getProgress = (topicKey, nodes) => {
       const normalize = (str) => str ? str.trim().toLowerCase() : "";
-      const mapData = userRoadmaps.find(r => normalize(r.topic) === topicKey);
-      if (!mapData || !mapData.graph_data || !mapData.graph_data.nodes) return null;
-      const nodes = mapData.graph_data.nodes; 
+      if (!nodes || nodes.length === 0) return null;
+      
       const completedNodeLabels = new Set(allScores.filter(s => normalize(s.topic) === topicKey && s.quiz_score >= 6).map(s => s.node_label));
       const percentage = Math.round((completedNodeLabels.size / nodes.length) * 100);
       const currentNode = nodes.find(n => !completedNodeLabels.has(n.label));
-      return { percentage, current: currentNode ? currentNode.label : "Completed! 🎉" };
+      return { percentage: Math.min(percentage, 100), current: currentNode ? currentNode.label : "Completed! 🎉" };
   };
 
   const toggleFolder = (key) => setExpandedFolders(prev => ({ ...prev, [key]: !prev[key] }));
   const uniqueKeys = Object.keys(folders);
 
-  // Rank Logic
   const totalScore = allScores.reduce((acc, curr) => acc + (curr.quiz_score || 0), 0);
   const getRank = (score) => {
       if (score > 150) return { title: "Tech Wizard", icon: "🧙‍♂️", color: "#9c27b0" };
@@ -197,7 +205,7 @@ function ProfilePage() {
           
           <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
              <h1 style={{ margin: 0, fontSize: isMobile ? '2rem' : '2.5rem', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-               👋 Hi, {userName}!
+                👋 Hi, {userName}!
              </h1>
              <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
                 <div style={{ padding: '5px 15px', background: rank.color, color: 'white', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '5px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
@@ -211,7 +219,7 @@ function ProfilePage() {
           <p style={{ color: '#94a3b8', marginTop: '5px', fontSize: '1.1rem' }}>Welcome back to your personal library.</p>
         </div>
 
-        {/* ✅ FLASHCARDS ALERT SECTION */}
+        {/* FLASHCARDS ALERT */}
         {dueFlashcards.length > 0 && (
             <div style={{
                 background: 'linear-gradient(45deg, #FF6B6B, #FF8E53)', 
@@ -270,13 +278,12 @@ function ProfilePage() {
         </div>
 
         {/* Folders List */}
-        {loading ? <p>Loading...</p> : (
+        {loading ? <div className="spinner"></div> : (
             activeTab === 'library' ? (
                 uniqueKeys.length === 0 ? <div style={{textAlign:'center', padding:'50px', color:'#666'}}><h3>No Saved Content 📂</h3></div> :
                 <div>
                     {uniqueKeys.map(key => {
                         const folder = folders[key];
-                        const progress = getProgress(key); 
                         return (
                             <div key={key} style={{ marginBottom: '20px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', overflow:'hidden', border:'1px solid rgba(255,255,255,0.1)' }}>
                                 <div style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -284,74 +291,100 @@ function ProfilePage() {
                                       <div style={{display:'flex', alignItems:'center', gap:'10px', fontWeight:'bold', fontSize:'1.1rem'}}>
                                           {expandedFolders[key] ? <FaFolderOpen color="#ffc107" size={24}/> : <FaFolder color="#ffc107" size={24}/>}
                                           <span style={{textTransform:'capitalize'}}>{folder.displayTitle}</span>
+                                          <span style={{fontSize:'0.8rem', color:'#aaa', background:'rgba(0,0,0,0.3)', padding:'2px 8px', borderRadius:'10px'}}>{folder.roadmaps.length} Maps • {folder.resourcesCount} Items</span>
                                       </div>
-                                      {progress && (
-                                          <div style={{width:'100%', maxWidth:'400px', marginTop:'5px'}}>
-                                              <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', color:'#aaa', marginBottom:'2px'}}>
-                                                  <span>{progress.percentage}% Complete</span>
-                                                  <span style={{color:'#00d2ff', display:'flex', alignItems:'center', gap:'4px'}}><FaRunning/> Next: {progress.current}</span>
-                                              </div>
-                                              <div style={{width:'100%', height:'8px', background:'rgba(255,255,255,0.1)', borderRadius:'4px', overflow:'hidden'}}>
-                                                  <div style={{width: `${progress.percentage}%`, height:'100%', background: progress.percentage === 100 ? '#28a745' : '#00d2ff', transition:'width 0.5s ease'}}></div>
-                                              </div>
-                                          </div>
-                                      )}
                                     </div>
                                     <span style={{color:'#aaa', marginRight:'10px'}}>{expandedFolders[key] ? <FaChevronDown/> : <FaChevronRight/>}</span>
-                                    {folder.hasRoadmap && (
-                                      <button onClick={() => handleDeleteRoadmap(folder.displayTitle)} style={{background:'none', border:'none', cursor:'pointer', color:'#ff6b6b', padding:'10px'}}>
-                                          <FaTrash size={18} />
-                                      </button>
-                                    )}
                                 </div>
 
                                 {expandedFolders[key] && (
                                     <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)' }}>
-                                            {folder.hasRoadmap && (
-                                                <button onClick={() => navigate(`/roadmap/${folder.displayTitle}`)} style={{marginBottom:'20px', padding:'8px 15px', background:'#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', width: isMobile ? '100%' : 'auto'}}>View Map 🗺️</button>
-                                            )}
-
-                                            {Object.keys(folder.subfolders).map(subNode => {
-                                                const status = getNodeStatus(folder.displayTitle, subNode);
-                                                return (
-                                                    <div key={subNode} style={{ marginLeft: isMobile ? '0' : '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
-                                                        <h4 style={{ margin: '0 0 10px 0', color: 'white', display:'flex', alignItems:'center', gap:'10px' }}>
-                                                          {status.hasPassed ? <FaCheckCircle color="#28a745"/> : <span style={{width:'16px'}}></span>}
-                                                          {subNode}
-                                                          {status.isWeak && (
-                                                              <span style={{fontSize:'0.75rem', background:'rgba(255, 107, 107, 0.2)', color:'#ff6b6b', padding:'4px 8px', borderRadius:'12px', border:'1px solid rgba(255, 107, 107, 0.3)', display:'flex', alignItems:'center', gap:'5px'}}>
-                                                                  <FaExclamationTriangle/> Weak Zone
-                                                              </span>
-                                                          )}
-                                                        </h4>
+                                        
+                                        {/* ✅ Display multiple roadmaps (Panic / Regular) */}
+                                        {folder.roadmaps.length > 0 && (
+                                            <div style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'25px'}}>
+                                                {folder.roadmaps.map(rm => {
+                                                    const progress = getProgress(key, rm.graph_data?.nodes);
+                                                    const isPanic = rm.mode === 'panic';
+                                                    
+                                                    return (
+                                                    <div key={rm.id} style={{
+                                                        background: 'rgba(255,255,255,0.05)', border: `1px solid ${isPanic ? '#ff6b6b' : '#00d2ff'}`, 
+                                                        borderRadius: '8px', padding: '15px', flex: '1 1 300px', display:'flex', flexDirection:'column', gap:'10px'
+                                                    }}>
+                                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                            <div style={{
+                                                                background: isPanic ? 'rgba(255, 107, 107, 0.2)' : 'rgba(0, 210, 255, 0.2)',
+                                                                color: isPanic ? '#ff6b6b' : '#00d2ff',
+                                                                padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold'
+                                                            }}>
+                                                                {isPanic ? '🚨 Panic Mode' : '📚 Regular Mode'}
+                                                            </div>
+                                                            <button onClick={() => handleDeleteRoadmap(rm.id, folder.displayTitle, rm.mode)} style={{background:'none', border:'none', cursor:'pointer', color:'#ff6b6b'}}>
+                                                                <FaTrash size={14} />
+                                                            </button>
+                                                        </div>
                                                         
-                                                        {folder.subfolders[subNode].scores.map((s, i) => (
-                                                            <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
-                                                              <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)', color: s.quiz_score >=6 ? '#28a745' : '#ffc107', borderRadius:'15px', fontSize:'0.8rem', border: s.quiz_score>=6?'1px solid rgba(40,167,69,0.3)':'1px solid rgba(255,193,7,0.3)'}}>
-                                                                  <FaStar/> Score: {s.quiz_score}/10
-                                                              </div>
-                                                              <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'5px', background:'rgba(255,255,255,0.05)', color:'white', display:'flex', alignItems:'center', gap:'4px'}}>
-                                                                  <FaRedo size={10}/> Retake
-                                                              </button>
+                                                        {progress && (
+                                                            <div style={{width:'100%', marginTop:'5px'}}>
+                                                                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', color:'#aaa', marginBottom:'4px'}}>
+                                                                    <span>{progress.percentage}% Complete</span>
+                                                                    <span style={{color: isPanic ? '#ff6b6b' : '#00d2ff', display:'flex', alignItems:'center', gap:'4px'}}><FaRunning/> Next: {progress.current}</span>
+                                                                </div>
+                                                                <div style={{width:'100%', height:'6px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
+                                                                    <div style={{width: `${progress.percentage}%`, height:'100%', background: progress.percentage === 100 ? '#28a745' : (isPanic ? '#ff6b6b' : '#00d2ff'), transition:'width 0.5s ease'}}></div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <button onClick={() => navigate(`/roadmap/${folder.displayTitle}?mode=${rm.mode}`)} style={{marginTop:'auto', padding:'8px', background: isPanic ? '#ff6b6b' : '#00d2ff', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'0.9rem', fontWeight:'bold'}}>
+                                                            Open Map 🗺️
+                                                        </button>
+                                                    </div>
+                                                )})}
+                                            </div>
+                                        )}
+
+                                        {Object.keys(folder.subfolders).map(subNode => {
+                                            const status = getNodeStatus(folder.displayTitle, subNode);
+                                            return (
+                                                <div key={subNode} style={{ marginLeft: isMobile ? '0' : '20px', marginBottom: '20px', paddingLeft: '15px', borderLeft: status.isWeak ? '4px solid #ff6b6b' : '3px solid rgba(255,255,255,0.1)' }}>
+                                                    <h4 style={{ margin: '0 0 10px 0', color: 'white', display:'flex', alignItems:'center', gap:'10px' }}>
+                                                        {status.hasPassed ? <FaCheckCircle color="#28a745"/> : <span style={{width:'16px'}}></span>}
+                                                        {subNode}
+                                                        {status.isWeak && (
+                                                            <span style={{fontSize:'0.75rem', background:'rgba(255, 107, 107, 0.2)', color:'#ff6b6b', padding:'4px 8px', borderRadius:'12px', border:'1px solid rgba(255, 107, 107, 0.3)', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                                <FaExclamationTriangle/> Weak Zone
+                                                            </span>
+                                                        )}
+                                                    </h4>
+                                                    
+                                                    {folder.subfolders[subNode].scores.map((s, i) => (
+                                                        <div key={i} style={{display:'inline-flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
+                                                            <div style={{display:'inline-block', padding:'5px 10px', background: s.quiz_score >=6 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)', color: s.quiz_score >=6 ? '#28a745' : '#ffc107', borderRadius:'15px', fontSize:'0.8rem', border: s.quiz_score>=6?'1px solid rgba(40,167,69,0.3)':'1px solid rgba(255,193,7,0.3)'}}>
+                                                                <FaStar/> Score: {s.quiz_score}/10
+                                                            </div>
+                                                            <button onClick={() => handleRetake(folder.displayTitle, subNode)} style={{padding:'2px 8px', fontSize:'0.8rem', cursor:'pointer', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'5px', background:'rgba(255,255,255,0.05)', color:'white', display:'flex', alignItems:'center', gap:'4px'}}>
+                                                                <FaRedo size={10}/> Retake
+                                                            </button>
+                                                        </div>
+                                                    ))}
+
+                                                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
+                                                        {folder.subfolders[subNode].resources.map(res => (
+                                                            <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px'}}>
+                                                                <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
+                                                                    {res.resource_type === 'video' ? <FaVideo color="#ff6b6b"/> : res.resource_type === 'article' ? <FaGlobe color="#4caf50"/> : <FaFilePdf color="#ffc107"/>}
+                                                                    <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
+                                                                </a>
+                                                                <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', padding:'0 5px'}}>
+                                                                    <FaTrash size={12}/>
+                                                                </button>
                                                             </div>
                                                         ))}
-
-                                                        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'10px'}}>
-                                                            {folder.subfolders[subNode].resources.map(res => (
-                                                                <div key={res.id} style={{position:'relative', display:'flex', alignItems:'center', gap:'10px', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'8px'}}>
-                                                                    <a href={res.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px', flex:1, overflow:'hidden'}}>
-                                                                            {res.resource_type === 'video' ? <FaVideo color="#ff6b6b"/> : res.resource_type === 'article' ? <FaGlobe color="#4caf50"/> : <FaFilePdf color="#ffc107"/>}
-                                                                            <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{res.title}</span>
-                                                                    </a>
-                                                                    <button onClick={() => handleDeleteResource(res.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#aaa', padding:'0 5px'}}>
-                                                                            <FaTrash size={12}/>
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
                                                     </div>
-                                                );
-                                            })}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -387,7 +420,7 @@ function ProfilePage() {
 
       <ConfirmationModal 
         isOpen={deleteConfirm.show}
-        title={`Delete "${deleteConfirm.title}"?`}
+        title={deleteConfirm.title}
         message="Are you sure you want to delete this? This action cannot be undone."
         onConfirm={executeDelete}
         onCancel={() => setDeleteConfirm(prev => ({ ...prev, show: false }))}
@@ -403,7 +436,6 @@ function ProfilePage() {
           />
       )}
 
-      {/* ✅ FLASHCARD MODAL */}
       {showFlashcards && dueFlashcards.length > 0 && (
           <FlashcardModal 
             cards={dueFlashcards} 
