@@ -15,7 +15,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
-  // 🔴 NEW: State for Custom Exit Popup
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const loadQuiz = async () => {
@@ -74,21 +73,25 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
     onComplete(score, feedbackText);
   };
 
+  // ✅ CHANGED: Added function to handle failure review
+  const handleFailAndReview = () => {
+    onComplete(score, "Failed, reviewing resources.");
+  };
+
   const handleRetakeSelf = () => loadQuiz();
   const handleSwitchToFull = () => { if (onRetry) onRetry(); };
 
-  // 🔴 UPDATED: Trigger Custom Popup instead of window.confirm
   const handleExitClick = () => {
       setShowExitConfirm(true); 
   };
 
   const confirmQuit = () => {
       setShowExitConfirm(false);
-      onClose(); // Close the modal effectively
+      onClose(); 
   };
 
   const cancelQuit = () => {
-      setShowExitConfirm(false); // Just hide the popup
+      setShowExitConfirm(false); 
   };
 
   if (loading) {
@@ -131,7 +134,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                     <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
                         Q{currentQ + 1}/{questions.length}
                     </span>
-                    {/* Trigger Custom Popup */}
                     <button onClick={handleExitClick} style={{ background: '#dc3545', border: 'none', color: 'white', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', title: 'Quit Test' }}>
                         <FaTimes size={14}/>
                     </button>
@@ -212,6 +214,10 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems:'center' }}>
                     <div style={{display:'flex', gap:'10px', width:'100%', flexDirection: 'column'}}> 
+                        {/* ✅ CHANGED: Added the button to trigger resources on failure */}
+                        <button onClick={handleFailAndReview} style={{ padding: '15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%', fontSize:'1.1rem' }}>
+                            Review Resources 📚
+                        </button>
                         <button onClick={handleRetakeSelf} style={{ padding: '12px', background: '#e9ecef', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
                             🔄 Retake
                         </button>
@@ -224,7 +230,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
           </div>
         )}
 
-        {/* 🔴 CUSTOM EXIT CONFIRMATION OVERLAY */}
         {showExitConfirm && (
             <div style={{
                 position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
