@@ -19,7 +19,7 @@ function RoadmapGraph() {
   const isMobile = useMobile(); 
   
   const [nodes, setNodes] = useState([]);
-  const [flashcards, setFlashcards] = useState([]); // ✅ NEW
+  const [flashcards, setFlashcards] = useState([]); 
   const [selectedNode, setSelectedNode] = useState(null);
   const [resources, setResources] = useState({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 });
   const [completedNodes, setCompletedNodes] = useState(new Set());
@@ -35,6 +35,7 @@ function RoadmapGraph() {
   const [mapLoading, setMapLoading] = useState(true);
   
   const mapFetched = useRef(false);
+  const resourcesRef = useRef(null); 
 
   useEffect(() => {
     if (mapFetched.current === topic + location.search) return;
@@ -50,7 +51,6 @@ function RoadmapGraph() {
             if (data && data.nodes) setNodes(data.nodes);
             else setNodes([{id:'1', label:`${topic} Basics`}]);
             
-            // ✅ Capture Flashcards
             if (data.flashcards) setFlashcards(data.flashcards);
 
             if (mode === 'panic') showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
@@ -85,7 +85,7 @@ function RoadmapGraph() {
             user_id: user.id, 
             topic: topic, 
             graph_data: { nodes: nodes },
-            flashcards: flashcards // ✅ Save Flashcards
+            flashcards: flashcards 
         });
         showNotification("Roadmap & Flashcards saved!");
     } catch (e) { showNotification("Error saving roadmap", "error"); }
@@ -112,29 +112,32 @@ function RoadmapGraph() {
   const handleStartFullAssessment = () => { setQuizType('full'); setShowQuizModal(true); };
   const handleUpgradeToFull = () => { setQuizType('full'); };
 
-  const handleQuizComplete = async (score, feedback) => {
+  const handleQuizComplete = (score, feedback) => {
     setShowQuizModal(false);
+    
     if(user) {
-        try {
-            const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            await axios.post(`${baseUrl}/api/submit_progress`, { 
-                user_id: user.id, 
-                username: user.user_metadata?.full_name || user.email.split('@')[0],
-                topic: topic, 
-                node_label: checkNode.label, 
-                score: score, 
-                feedback: feedback 
-            });
-        } catch(e) { console.error(e); }
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        axios.post(`${baseUrl}/api/submit_progress`, { 
+            user_id: user.id, 
+            username: user.user_metadata?.full_name || user.email.split('@')[0],
+            topic: topic, 
+            node_label: checkNode.label, 
+            score: score, 
+            feedback: feedback 
+        }).catch(e => console.error("Progress save error:", e));
     }
+    
     let passed = quizType === 'diagnostic' ? score >= 3 : score >= 6; 
+    
     if (passed) {
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
-        showNotification("🎉 Module Passed! Unlocked next step.");
+        showNotification("🎉 Module Passed! Fetching resources...");
     } else {
-        if (quizType === 'diagnostic') fetchResources(checkNode); 
-        else showNotification("Keep studying! Try again later.", "error");
+        showNotification("Test finished. Fetching study materials... 📚", "info");
     }
+    
+    // ✅ CHANGED: This is now outside the if/else block so it ALWAYS runs
+    fetchResources(checkNode);
   };
 
   const fetchResources = async (node) => {
@@ -149,11 +152,24 @@ function RoadmapGraph() {
         const res = await axios.get(`${baseUrl}/api/resources`, {
             params: { search_query: searchQuery, topic_key: topic, node_label: node.label, mode: mode }
         });
-        setResources(res.data);
-    } catch(e) { console.error(e); } 
+        
+        const data = res.data || {};
+        setResources({
+            videos: data.videos || [],
+            articles: data.articles || [],
+            pdfs: data.pdfs || [],
+            trust_score: data.trust_score || null,
+            review_count: data.review_count || 0
+        });
+    } catch(e) { 
+        console.error(e); 
+        showNotification("Failed to load resources", "error");
+    } 
     finally { 
         setLoadingResources(false); 
-        setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100); 
+        setTimeout(() => {
+            resourcesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300); 
     }
   };
 
@@ -172,7 +188,6 @@ function RoadmapGraph() {
 
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
-      {/* Header */}
       <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
             <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center', fontSize: isMobile ? '1.5rem' : '2rem' }}>
@@ -186,7 +201,6 @@ function RoadmapGraph() {
         </div>
       </div>
 
-      {/* Graph */}
       <div style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {rows.map((row, rowIndex) => {
           const isEvenRow = rowIndex % 2 === 0;
@@ -250,13 +264,12 @@ function RoadmapGraph() {
         })}
       </div>
 
-      {/* Resources Section */}
-      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '50px 20px', borderTop: '2px solid rgba(255,255,255,0.1)', minHeight: '500px' }}>
+      <div ref={resourcesRef} style={{ background: 'rgba(0,0,0,0.2)', padding: '50px 20px', borderTop: '2px solid rgba(255,255,255,0.1)', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                 
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', flexWrap:'wrap', gap:'15px'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'10px', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center'}}>
+                    <div style={{display:'flex', gap:'10px', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center'}}>
                         <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
                             📚 Resources: <span style={{color:'#00d2ff'}}>{selectedNode.label}</span>
                         </h2>
