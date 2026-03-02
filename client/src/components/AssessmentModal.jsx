@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';       
 import rehypeKatex from 'rehype-katex';     
 import 'katex/dist/katex.min.css';          
-import { FaCheckCircle, FaTimesCircle, FaArrowRight, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
+import { FaArrowRight, FaTimes, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 
 function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10, onClose, onComplete, onRetry }) {
   const [questions, setQuestions] = useState([]);
@@ -15,6 +15,7 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
+  const [answerHistory, setAnswerHistory] = useState([]);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const loadQuiz = async () => {
@@ -23,7 +24,9 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
       setCurrentQ(0);
       setQuizFinished(false);
       setIsAnswered(false);      
-      setSelectedOption(null);   
+      setSelectedOption(null); 
+      setAnswerHistory([]); 
+      
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         const url = `${baseUrl}/api/quiz?main_topic=${encodeURIComponent(mainTopic)}&sub_topic=${encodeURIComponent(subTopic)}&num=${questionCount}&history=${encodeURIComponent(history)}`;
@@ -51,9 +54,17 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
     if (isAnswered) return; 
     setSelectedOption(optionIndex);
     setIsAnswered(true);
-    if (optionIndex === questions[currentQ].correct_answer) {
+    
+    const isCorrect = optionIndex === questions[currentQ].correct_answer;
+    
+    if (isCorrect) {
       setScore(prev => prev + 1);
     }
+    
+    setAnswerHistory(prev => [...prev, {
+        qNum: currentQ + 1,
+        isCorrect: isCorrect
+    }]);
   };
 
   const handleNext = () => {
@@ -73,7 +84,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
     onComplete(score, feedbackText);
   };
 
-  // ✅ CHANGED: Added function to handle failure review
   const handleFailAndReview = () => {
     onComplete(score, "Failed, reviewing resources.");
   };
@@ -106,15 +116,20 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
     );
   }
 
+  // ✅ UPDATED: Shows Green if they clicked the right answer, Red if they clicked the wrong answer. 
+  // It NEVER highlights the correct answer if they didn't click it.
   const getOptionStyle = (index) => {
       const isSelected = selectedOption === index;
       const isCorrect = index === questions[currentQ].correct_answer;
       
       if (!isAnswered) return { background: 'white', border: '1px solid #ddd', color: '#333' };
-      if (isCorrect) return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' };
-      if (isSelected && !isCorrect) return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' };
       
-      return { background: '#f9f9f9', border: '1px solid #eee', color: '#aaa', opacity: 0.6 };
+      if (isSelected) {
+          if (isCorrect) return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' }; // Green
+          return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' }; // Red
+      }
+      
+      return { background: '#f9f9f9', border: '1px solid #eee', color: '#aaa', opacity: 0.6 }; // Neutral fade for the rest
   };
 
   return (
@@ -154,6 +169,9 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                 <div style={{ display: 'grid', gap: '15px' }}>
                     {questions[currentQ].options.map((opt, i) => {
                         const style = getOptionStyle(i);
+                        const isSelected = selectedOption === i;
+                        const isCorrect = i === questions[currentQ].correct_answer;
+                        
                         return (
                             <button 
                                 key={i} 
@@ -169,8 +187,9 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                                     <span style={{ fontWeight: 'bold', marginRight: '15px', opacity: 0.7 }}>{String.fromCharCode(65 + i)}</span>
                                     <span>{opt}</span>
                                 </div>
-                                {isAnswered && i === questions[currentQ].correct_answer && <FaCheckCircle color="#28a745"/>}
-                                {isAnswered && selectedOption === i && i !== questions[currentQ].correct_answer && <FaTimesCircle color="#dc3545"/>}
+                                {/* ✅ ONLY show the icon on the option the user actually clicked */}
+                                {isAnswered && isSelected && isCorrect && <FaCheckCircle color="#28a745"/>}
+                                {isAnswered && isSelected && !isCorrect && <FaTimesCircle color="#dc3545"/>}
                             </button>
                         );
                     })}
@@ -191,7 +210,7 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
           </>
         ) : (
           <div style={{ padding: '50px', textAlign:'center' }}>
-            <div style={{ fontSize: '5rem', marginBottom: '20px' }}>
+            <div style={{ fontSize: '5rem', marginBottom: '10px' }}>
                 {hasPassed ? "🏆" : "⚠️"}
             </div>
             
@@ -199,11 +218,30 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                 {hasPassed ? "Passed!" : "Assessment Failed"}
             </h1>
             
-            <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '30px' }}>
+            <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '20px' }}>
                 You scored <strong>{score} / {questions.length}</strong>.
                 <br/>
                 {hasPassed ? "Excellent work! Knowledge verified." : "Review the material and try again."}
             </p>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginBottom: '30px' }}>
+                {answerHistory.map((item, idx) => (
+                    <div key={idx} style={{
+                        padding: '8px 15px',
+                        borderRadius: '8px',
+                        background: item.isCorrect ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)',
+                        border: `1px solid ${item.isCorrect ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)'}`,
+                        color: item.isCorrect ? '#28a745' : '#dc3545',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}>
+                        Q{item.qNum}: {item.isCorrect ? <FaCheckCircle /> : <FaTimesCircle />}
+                    </div>
+                ))}
+            </div>
 
             {hasPassed ? (
                 <div>
@@ -214,7 +252,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems:'center' }}>
                     <div style={{display:'flex', gap:'10px', width:'100%', flexDirection: 'column'}}> 
-                        {/* ✅ CHANGED: Added the button to trigger resources on failure */}
                         <button onClick={handleFailAndReview} style={{ padding: '15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%', fontSize:'1.1rem' }}>
                             Review Resources 📚
                         </button>
