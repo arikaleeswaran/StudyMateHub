@@ -25,11 +25,8 @@ function Navbar() {
       }}>
         {user ? (
           <>
-<<<<<<< Updated upstream
-=======
             <button onClick={() => navigate('/')} style={styles.navButton}><FaHome size={18} color="#4CAF50" /> {isMobile ? '' : 'Home'}</button>
             <button onClick={() => navigate('/squads')} style={styles.navButton}><FaShieldAlt size={18} color="#00d2ff" /> {isMobile ? '' : 'Squads'}</button>
->>>>>>> Stashed changes
             <button onClick={() => navigate('/leaderboard')} style={styles.navButton}><FaTrophy size={18} color="#FFD700" /> {isMobile ? '' : 'Leaderboard'}</button>
             <button onClick={() => navigate('/profile')} style={styles.navButton}><FaUserCircle size={18} /> {isMobile ? '' : 'Dashboard'}</button>
             <button onClick={() => navigate('/admin/login')} style={styles.navButton} title="Admin Panel"><FaUserShield size={18} color="#ff4444" /></button>
