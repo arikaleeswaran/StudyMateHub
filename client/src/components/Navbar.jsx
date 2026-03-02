@@ -25,6 +25,7 @@ function Navbar() {
       }}>
         {user ? (
           <>
+            <button onClick={() => navigate('/')} style={styles.navButton}><FaHome size={18} color="#4CAF50" /> {isMobile ? '' : 'Home'}</button>
             <button onClick={() => navigate('/squads')} style={styles.navButton}><FaShieldAlt size={18} color="#00d2ff" /> {isMobile ? '' : 'Squads'}</button>
             <button onClick={() => navigate('/leaderboard')} style={styles.navButton}><FaTrophy size={18} color="#FFD700" /> {isMobile ? '' : 'Leaderboard'}</button>
             <button onClick={() => navigate('/profile')} style={styles.navButton}><FaUserCircle size={18} /> {isMobile ? '' : 'Dashboard'}</button>
@@ -38,7 +39,6 @@ function Navbar() {
     </div>
   );
 }
-
 
 const styles = {
   nav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', backdropFilter: 'blur(10px)', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' },
