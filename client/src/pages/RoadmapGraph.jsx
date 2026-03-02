@@ -37,16 +37,21 @@ function RoadmapGraph() {
   const mapFetched = useRef(false);
   const resourcesRef = useRef(null); 
 
+  // Get current mode
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('mode') || 'standard';
+
   useEffect(() => {
     if (mapFetched.current === topic + location.search) return;
     const init = async () => {
         mapFetched.current = topic + location.search;
         setMapLoading(true);
-        const params = new URLSearchParams(location.search);
-        const mode = params.get('mode') || 'standard';
+        
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}`);
+            // ✅ UPDATED: Pass user_id so backend fetches your exact saved nodes!
+            const userQuery = user ? `&user_id=${user.id}` : '';
+            const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}${userQuery}`);
             const data = res.data;
             if (data && data.nodes) setNodes(data.nodes);
             else setNodes([{id:'1', label:`${topic} Basics`}]);
@@ -84,11 +89,18 @@ function RoadmapGraph() {
         await axios.post(`${baseUrl}/api/save_roadmap`, { 
             user_id: user.id, 
             topic: topic, 
+            mode: mode, 
             graph_data: { nodes: nodes },
             flashcards: flashcards 
         });
-        showNotification("Roadmap & Flashcards saved!");
-    } catch (e) { showNotification("Error saving roadmap", "error"); }
+        showNotification(`${mode === 'panic' ? '🚨 Panic' : '📚 Regular'} Roadmap saved!`);
+    } catch (e) { 
+        if (e.response && e.response.status === 409) {
+            showNotification(`⚠️ You already have this ${mode} roadmap in your profile. Check there or delete it first.`, "error");
+        } else {
+            showNotification("Error saving roadmap", "error"); 
+        }
+    }
   };
 
   const handleSaveResource = async (item, type) => {
@@ -136,7 +148,6 @@ function RoadmapGraph() {
         showNotification("Test finished. Fetching study materials... 📚", "info");
     }
     
-    // ✅ CHANGED: This is now outside the if/else block so it ALWAYS runs
     fetchResources(checkNode);
   };
 
@@ -144,8 +155,6 @@ function RoadmapGraph() {
     setSelectedNode(node);
     setResources({ videos: [], articles: [], pdfs: [], trust_score: null, review_count: 0 }); 
     setLoadingResources(true);
-    const params = new URLSearchParams(location.search);
-    const mode = params.get('mode') || 'standard';
     try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
         const searchQuery = `${topic} ${node.label}`;
@@ -190,6 +199,20 @@ function RoadmapGraph() {
 
       <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
+            
+            {/* ✅ NEW: Mode Label Badge Added Here */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+                <span style={{
+                    background: mode === 'panic' ? 'rgba(255, 107, 107, 0.2)' : 'rgba(0, 210, 255, 0.2)',
+                    color: mode === 'panic' ? '#ff6b6b' : '#00d2ff',
+                    padding: '5px 15px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', 
+                    border: `1px solid ${mode === 'panic' ? '#ff6b6b' : '#00d2ff'}`,
+                    textTransform: 'uppercase', letterSpacing: '1px'
+                }}>
+                    {mode === 'panic' ? '🚨 Panic Mode' : '📚 Regular Mode'}
+                </span>
+            </div>
+
             <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center', fontSize: isMobile ? '1.5rem' : '2rem' }}>
                 🗺️ Path: <span style={{color: '#00d2ff'}}>{topic}</span>
             </h2>

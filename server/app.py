@@ -156,14 +156,14 @@ def scrape_articles(topic, mode='standard', max_results=4):
         if mode == 'panic':
             articles = [
                 {"title": f"⚡ Quick Ref: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+quick+reference",
-                    "type": "article", "snippet": "Fast facts."},
+                 "type": "article", "snippet": "Fast facts."},
                 {"title": f"📝 Exam Notes: {smart_topic}", "url": f"https://www.google.com/search?q={safe_topic}+exam+notes",
                  "type": "article", "snippet": "Revision notes."},
             ]
         else:
             articles = [
                 {"title": f"GeeksforGeeks: {smart_topic}", "url": f"https://www.geeksforgeeks.org/search?q={safe_topic}",
-                    "type": "article", "snippet": "Click to search."},
+                 "type": "article", "snippet": "Click to search."},
                 {"title": f"W3Schools: Learn {smart_topic}", "url": f"https://www.google.com/search?q=site:w3schools.com+{safe_topic}",
                  "type": "article", "snippet": "Beginner guides."},
                 {"title": f"Medium: Articles on {smart_topic}", "url": f"https://medium.com/search?q={safe_topic}",
@@ -485,15 +485,17 @@ def get_recommendations():
         if not sorted_recs:
             return jsonify([
                 {"title": "🔥 Popular: Python Roadmap", "url": "https://roadmap.sh/python",
-                    "resource_type": "article", "topic": "Python", "count": 150},
+                 "resource_type": "article", "topic": "Python", "count": 150},
                 {"title": "🎥 Watch: Machine Learning Basics", "url": "https://www.youtube.com/watch?v=GwIo3gDZCVQ",
-                    "resource_type": "video", "topic": "Machine Learning", "count": 120},
+                 "resource_type": "video", "topic": "Machine Learning", "count": 120},
                 {"title": "📄 PDF: System Design Cheat Sheet", "url": "https://github.com/donnemartin/system-design-primer",
-                    "resource_type": "article", "topic": "System Design", "count": 95}
+                 "resource_type": "article", "topic": "System Design", "count": 95}
             ])
         return jsonify(sorted_recs)
     except Exception as e:
         return jsonify([])
+
+# ✅ UPDATED SAVE ROADMAP (WITH DUPLICATE CHECK)
 
 
 @app.route('/api/save_roadmap', methods=['POST'])
@@ -501,17 +503,26 @@ def save_roadmap():
     data = request.json
     user_id = data.get('user_id')
     topic = data.get('topic', '').strip().title()
+    mode = data.get('mode', 'standard')  # Extract mode
     flashcards = data.get('flashcards', [])
 
     try:
-        # 1. Save Roadmap
-        supabase.table('user_roadmaps').upsert({
+        # 1. SMART DUPLICATE CHECK: Does this exact mode + topic already exist?
+        existing = supabase.table('user_roadmaps').select('id').eq(
+            'user_id', user_id).eq('topic', topic).eq('mode', mode).execute()
+
+        if existing.data:
+            return jsonify({"error": "duplicate", "message": f"You already have a {mode} roadmap for {topic} in your profile."}), 409
+
+        # 2. Save Roadmap
+        supabase.table('user_roadmaps').insert({
             "user_id": user_id,
             "topic": topic,
+            "mode": mode,  # ✅ Save the mode
             "graph_data": data.get('graph_data')
         }).execute()
 
-        # 2. Save Flashcards (if any)
+        # 3. Save Flashcards (if any)
         if flashcards:
             for card in flashcards:
                 supabase.table('user_flashcards').insert({
@@ -619,17 +630,28 @@ def get_leaderboard():
 def get_roadmap():
     topic = request.args.get('topic', '').strip().title()
     mode = request.args.get('mode', 'standard')
+    user_id = request.args.get('user_id')
 
-    if mode == 'standard':
+    # 1. SMART FETCH: If user is logged in, grab THEIR exact saved roadmap first!
+    if user_id:
         try:
-            existing = supabase.table('user_roadmaps').select(
-                'graph_data').eq('topic', topic).limit(1).execute()
-            if existing.data:
-                return jsonify(existing.data[0]['graph_data'])
-        except:
-            pass
+            existing_user_map = supabase.table('user_roadmaps').select('graph_data').eq(
+                'user_id', user_id).eq('topic', topic).eq('mode', mode).limit(1).execute()
+            if existing_user_map.data:
+                return jsonify(existing_user_map.data[0]['graph_data'])
+        except Exception as e:
+            print(f"Error fetching user map: {e}")
 
-    # UPDATED PROMPT: Request Flashcards alongside Nodes
+    # 2. FALLBACK: If not saved by this user, look for ANY existing map for this topic & mode to save API costs
+    try:
+        existing_general = supabase.table('user_roadmaps').select(
+            'graph_data').eq('topic', topic).eq('mode', mode).limit(1).execute()
+        if existing_general.data:
+            return jsonify(existing_general.data[0]['graph_data'])
+    except:
+        pass
+
+    # 3. GENERATE NEW: If it doesn't exist anywhere, use AI to generate it
     prompt = f"""
     Create a learning path for '{topic}' ({mode} mode).
     Format: JSON Object with two keys: 'nodes' and 'flashcards'.
@@ -646,7 +668,6 @@ def get_roadmap():
                                                          {"role": "user", "content": prompt}], temperature=0.1, response_format={"type": "json_object"})
         data = parse_json_safely(completion.choices[0].message.content, "dict")
 
-        # Fallbacks if AI fails one part
         if not data:
             data = {}
         if 'nodes' not in data:
@@ -767,11 +788,20 @@ def get_resources():
     })
 
 
+# ✅ UPDATED DELETE ROADMAP (Deletes by ID to avoid wiping both modes at once)
 @app.route('/api/delete_roadmap', methods=['DELETE'])
 def delete_roadmap():
     try:
-        supabase.table('user_roadmaps').delete().eq('user_id', request.args.get(
-            'user_id')).eq('topic', request.args.get('topic')).execute()
+        # Check if an ID was passed
+        roadmap_id = request.args.get('id')
+        if roadmap_id:
+            supabase.table('user_roadmaps').delete().eq(
+                'id', roadmap_id).execute()
+        else:
+            # Fallback for older code if needed
+            supabase.table('user_roadmaps').delete().eq('user_id', request.args.get(
+                'user_id')).eq('topic', request.args.get('topic')).execute()
+
         return jsonify({"message": "Deleted"})
     except:
         return jsonify({"error": "Failed"}), 500
