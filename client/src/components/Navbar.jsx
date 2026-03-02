@@ -2,7 +2,6 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaTrophy, FaUserShield, FaHome, FaShieldAlt } from 'react-icons/fa';
 import useMobile from '../hooks/useMobile';
-import { FaShieldAlt } from 'react-icons/fa';
 
 function Navbar() {
   const { user, signOut } = useAuth();
