@@ -116,8 +116,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
     );
   }
 
-  // ✅ UPDATED: Shows Green if they clicked the right answer, Red if they clicked the wrong answer. 
-  // It NEVER highlights the correct answer if they didn't click it.
   const getOptionStyle = (index) => {
       const isSelected = selectedOption === index;
       const isCorrect = index === questions[currentQ].correct_answer;
@@ -125,12 +123,15 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
       if (!isAnswered) return { background: 'white', border: '1px solid #ddd', color: '#333' };
       
       if (isSelected) {
-          if (isCorrect) return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' }; // Green
-          return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' }; // Red
+          if (isCorrect) return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' }; 
+          return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' }; 
       }
       
-      return { background: '#f9f9f9', border: '1px solid #eee', color: '#aaa', opacity: 0.6 }; // Neutral fade for the rest
+      return { background: '#f9f9f9', border: '1px solid #eee', color: '#aaa', opacity: 0.6 }; 
   };
+
+  // ✅ NEW: Simple validation (must be at least 3 characters long)
+  const isFeedbackValid = feedbackText.trim().length >= 3;
 
   return (
     <div className="modal-overlay">
@@ -187,7 +188,6 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                                     <span style={{ fontWeight: 'bold', marginRight: '15px', opacity: 0.7 }}>{String.fromCharCode(65 + i)}</span>
                                     <span>{opt}</span>
                                 </div>
-                                {/* ✅ ONLY show the icon on the option the user actually clicked */}
                                 {isAnswered && isSelected && isCorrect && <FaCheckCircle color="#28a745"/>}
                                 {isAnswered && isSelected && !isCorrect && <FaTimesCircle color="#dc3545"/>}
                             </button>
@@ -245,9 +245,35 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
 
             {hasPassed ? (
                 <div>
-                     <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>Optional Feedback:</label>
-                     <textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} style={{ width: '100%', height: '60px', padding: '10px', marginBottom:'20px', borderRadius:'5px', border:'1px solid #ccc' }} placeholder="What did you learn?"/>
-                     <button onClick={handleSubmit} style={{ width: '100%', padding: '15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', fontSize:'1.1rem' }}>Complete Module ✅</button>
+                     {/* ✅ UPDATED: Mandatory feedback UI */}
+                     <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>
+                         Required Feedback <span style={{color: 'red'}}>*</span>
+                     </label>
+                     <textarea 
+                        value={feedbackText} 
+                        onChange={(e) => setFeedbackText(e.target.value)} 
+                        style={{ width: '100%', height: '60px', padding: '10px', marginBottom:'15px', borderRadius:'5px', border: isFeedbackValid ? '1px solid #28a745' : '1px solid #ccc' }} 
+                        placeholder="Was this topic easy or hard? Your review helps others! (Min 3 chars)"
+                     />
+                     
+                     <button 
+                        onClick={handleSubmit} 
+                        disabled={!isFeedbackValid}
+                        style={{ 
+                            width: '100%', 
+                            padding: '15px', 
+                            background: isFeedbackValid ? '#28a745' : '#e9ecef', 
+                            color: isFeedbackValid ? 'white' : '#aaa', 
+                            border: 'none', 
+                            borderRadius: '8px', 
+                            cursor: isFeedbackValid ? 'pointer' : 'not-allowed', 
+                            fontWeight:'bold', 
+                            fontSize:'1.1rem',
+                            transition: 'all 0.3s ease'
+                        }}
+                     >
+                         {isFeedbackValid ? "Complete Module ✅" : "✍️ Enter feedback to finish"}
+                     </button>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems:'center' }}>
