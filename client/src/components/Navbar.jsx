@@ -40,6 +40,7 @@ function Navbar() {
   );
 }
 
+
 const styles = {
   nav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', backdropFilter: 'blur(10px)', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' },
   logo: { fontSize: '1.5rem', fontWeight: 'bold', cursor: 'pointer', background: 'linear-gradient(90deg, #00c6ff, #0072ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
