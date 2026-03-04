@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 
@@ -8,20 +9,39 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Check active session
+    let isMounted = true;
+
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setLoading(false);
+      try {
+        // We wrap this in a try-catch to prevent infinite freezing
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+            console.error("Supabase Auth Error:", error);
+            // If there's an error (like a network timeout), forcefully clear the corrupted session
+            await supabase.auth.signOut(); 
+            if (isMounted) setUser(null);
+        } else {
+            if (isMounted) setUser(session?.user ?? null);
+        }
+      } catch (err) {
+        console.error("Critical Auth Network Failure:", err);
+        if (isMounted) setUser(null);
+      } finally {
+        if (isMounted) setLoading(false); // ALWAYS turn off the loading spinner
+      }
     };
+    
     getSession();
 
-    // 2. Listen for changes (Login/Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (isMounted) setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+        isMounted = false;
+        subscription.unsubscribe();
+    }
   }, []);
 
   const value = {
@@ -31,9 +51,18 @@ export const AuthProvider = ({ children }) => {
     signOut: () => supabase.auth.signOut(),
   };
 
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', background: '#0f172a' }}>
+        <div style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #00d2ff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

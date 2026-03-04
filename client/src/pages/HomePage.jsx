@@ -111,9 +111,9 @@ function HomePage() {
         </div>
       </div>
 
-      <div style={styles.footerInfo}>
+      {/* <div style={styles.footerInfo}>
           <p><FaLightbulb color="#ffeb3b"/> Powered by StudyMateHub</p>
-      </div>
+      </div> */}
     </div>
   );
 }
