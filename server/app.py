@@ -415,43 +415,54 @@ def admin_login():
 def sync_guest_data():
     data = request.json
     user_id = data.get('user_id')
+    full_name = data.get('full_name', 'Scholar')
     guest_data = data.get('guest_data', {})
 
-    if not user_id or not guest_data:
-        return jsonify({"error": "Missing data"}), 400
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
 
     try:
-        # 1. Sync Roadmap
-        roadmap = guest_data.get('roadmap')
-        if roadmap:
-            supabase.table('user_roadmaps').upsert({
+        # 1. ALWAYS initialize user in leaderboard (with 0 points) if they are new
+        existing = supabase.table('leaderboard').select(
+            'user_id').eq('user_id', user_id).execute()
+        if not existing.data:
+            supabase.table('leaderboard').insert({
                 "user_id": user_id,
-                "topic": roadmap.get('topic', '').strip().title(),
-                "graph_data": roadmap.get('graph_data')
+                "full_name": full_name,
+                "score": 0,
+                "is_hidden": False
             }).execute()
 
-        # 2. Sync Progress (Quiz Scores)
-        progress_list = guest_data.get('progress', [])
-        if progress_list:
-            for item in progress_list:
-                item['user_id'] = user_id
-                supabase.table('node_progress').insert(item).execute()
+        # 2. Sync Guest Data ONLY if it exists
+        if guest_data:
+            roadmap = guest_data.get('roadmap')
+            if roadmap:
+                supabase.table('user_roadmaps').upsert({
+                    "user_id": user_id,
+                    "topic": roadmap.get('topic', '').strip().title(),
+                    "graph_data": roadmap.get('graph_data')
+                }).execute()
 
-                # Call internal submit logic to update leaderboard + squads
-                submit_progress_internal(
-                    user_id,
-                    item.get('username', 'Scholar'),
-                    item.get('quiz_score', 0)
-                )
+            progress_list = guest_data.get('progress', [])
+            if progress_list:
+                for item in progress_list:
+                    item['user_id'] = user_id
+                    supabase.table('node_progress').insert(item).execute()
 
-        # 3. Sync Saved Resources
-        resources_list = guest_data.get('resources', [])
-        if resources_list:
-            for res in resources_list:
-                res['user_id'] = user_id
-                supabase.table('saved_resources').insert(res).execute()
+                    # Call internal submit logic to update leaderboard + squads
+                    submit_progress_internal(
+                        user_id,
+                        full_name,
+                        item.get('quiz_score', 0)
+                    )
 
-        return jsonify({"success": True, "message": "Guest data merged successfully"})
+            resources_list = guest_data.get('resources', [])
+            if resources_list:
+                for res in resources_list:
+                    res['user_id'] = user_id
+                    supabase.table('saved_resources').insert(res).execute()
+
+        return jsonify({"success": True, "message": "User initialized and synced successfully"})
 
     except Exception as e:
         print(f"Sync Error: {e}")
@@ -495,8 +506,6 @@ def get_recommendations():
     except Exception as e:
         return jsonify([])
 
-# ✅ UPDATED SAVE ROADMAP (WITH DUPLICATE CHECK)
-
 
 @app.route('/api/save_roadmap', methods=['POST'])
 def save_roadmap():
@@ -518,7 +527,7 @@ def save_roadmap():
         supabase.table('user_roadmaps').insert({
             "user_id": user_id,
             "topic": topic,
-            "mode": mode,  # ✅ Save the mode
+            "mode": mode,  # Save the mode
             "graph_data": data.get('graph_data')
         }).execute()
 
@@ -554,8 +563,6 @@ def save_resource():
         return jsonify({"message": "Saved"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# --- UPDATED SUBMIT PROGRESS (SQUAD AWARE) ---
 
 
 def submit_progress_internal(user_id, username, score, topic='', node_label='', feedback=''):
@@ -615,12 +622,14 @@ def submit_progress():
         data.get('feedback', '')
     )
 
+# ✅ UPDATED: Public leaderboard ignores hidden users
+
 
 @app.route('/api/leaderboard', methods=['GET'])
 def get_leaderboard():
     try:
         response = supabase.table('leaderboard').select(
-            '*').order('score', desc=True).limit(10).execute()
+            '*').eq('is_hidden', False).order('score', desc=True).limit(10).execute()
         return jsonify(response.data)
     except Exception as e:
         return jsonify([])
@@ -632,7 +641,6 @@ def get_roadmap():
     mode = request.args.get('mode', 'standard')
     user_id = request.args.get('user_id')
 
-    # 1. SMART FETCH: If user is logged in, grab THEIR exact saved roadmap first!
     if user_id:
         try:
             existing_user_map = supabase.table('user_roadmaps').select('graph_data').eq(
@@ -642,7 +650,6 @@ def get_roadmap():
         except Exception as e:
             print(f"Error fetching user map: {e}")
 
-    # 2. FALLBACK: If not saved by this user, look for ANY existing map for this topic & mode to save API costs
     try:
         existing_general = supabase.table('user_roadmaps').select(
             'graph_data').eq('topic', topic).eq('mode', mode).limit(1).execute()
@@ -651,7 +658,6 @@ def get_roadmap():
     except:
         pass
 
-    # 3. GENERATE NEW: If it doesn't exist anywhere, use AI to generate it
     prompt = f"""
     Create a learning path for '{topic}' ({mode} mode).
     Format: JSON Object with two keys: 'nodes' and 'flashcards'.
@@ -694,7 +700,6 @@ def get_quiz():
     """
 
     if history:
-        # CUMULATIVE EXAM
         prompt = f"""
         Create a {num}-question multiple-choice assessment for a student learning '{main}'.
         
@@ -710,7 +715,6 @@ def get_quiz():
         Return strict JSON Array: [{{ "question": "...", "options": ["A","B","C","D"], "correct_answer": 0 }}]
         """
     else:
-        # FIRST MODULE
         prompt = f"""
         Create a {num}-question multiple-choice assessment for the topic: '{sub}' (Context: '{main}').
         
@@ -788,7 +792,6 @@ def get_resources():
     })
 
 
-# ✅ UPDATED DELETE ROADMAP (Deletes by ID to avoid wiping both modes at once)
 @app.route('/api/delete_roadmap', methods=['DELETE'])
 def delete_roadmap():
     try:
@@ -816,7 +819,9 @@ def delete_resource():
     except:
         return jsonify({"error": "Failed"}), 500
 
-# --- ADMIN ROUTES ---
+# ==========================================
+# --- ADMIN ROUTES (NEW POWERS ADDED) ---
+# ==========================================
 
 
 @app.route('/api/admin/stats', methods=['GET'])
@@ -844,7 +849,7 @@ def get_admin_stats():
 def get_admin_roadmaps():
     try:
         res = supabase.table('user_roadmaps').select(
-            '*').order('created_at', desc=True).limit(20).execute()
+            '*').order('created_at', desc=True).limit(30).execute()
         return jsonify(res.data)
     except:
         return jsonify([])
@@ -854,10 +859,12 @@ def get_admin_roadmaps():
 def get_admin_feedback():
     try:
         res = supabase.table('node_progress').select(
-            '*').neq('feedback_text', '').order('created_at', desc=True).limit(20).execute()
+            '*').neq('feedback_text', '').order('created_at', desc=True).limit(30).execute()
         return jsonify(res.data)
     except:
         return jsonify([])
+
+# ✅ UPDATED: Fetch ALL users for admin, even hidden ones
 
 
 @app.route('/api/admin/users', methods=['GET'])
@@ -869,12 +876,76 @@ def get_admin_users():
     except:
         return jsonify([])
 
+# ✅ NEW: Hide/Show user on public leaderboard
+
+
+@app.route('/api/admin/users/hide', methods=['POST'])
+def admin_hide_user():
+    data = request.json
+    user_id = data.get('user_id')
+    is_hidden = data.get('is_hidden')
+    try:
+        supabase.table('leaderboard').update(
+            {"is_hidden": is_hidden}).eq('user_id', user_id).execute()
+        return jsonify({"message": f"User hidden status updated to {is_hidden}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ✅ NEW: Permanently delete a user from the platform
+
+
+@app.route('/api/admin/users/delete', methods=['DELETE'])
+def admin_delete_user():
+    user_id = request.args.get('user_id')
+    try:
+        # We must wipe them from all tables to completely erase their footprint
+        supabase.table('leaderboard').delete().eq('user_id', user_id).execute()
+        supabase.table('user_roadmaps').delete().eq(
+            'user_id', user_id).execute()
+        supabase.table('node_progress').delete().eq(
+            'user_id', user_id).execute()
+        supabase.table('saved_resources').delete().eq(
+            'user_id', user_id).execute()
+        return jsonify({"message": "User data completely wiped"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ✅ NEW: Fetch all Squads for moderation
+
+
+@app.route('/api/admin/squads', methods=['GET'])
+def get_admin_squads():
+    try:
+        res = supabase.table('squads').select(
+            '*').order('total_score', desc=True).execute()
+        return jsonify(res.data)
+    except:
+        return jsonify([])
+
+# ✅ NEW: Delete a Squad
+
+
+@app.route('/api/admin/squads/delete', methods=['DELETE'])
+def admin_delete_squad():
+    squad_id = request.args.get('squad_id')
+    try:
+        # First, kick all members out of the squad so their profiles don't crash
+        supabase.table('leaderboard').update(
+            {"squad_id": None}).eq('squad_id', squad_id).execute()
+        # Then delete the squad itself
+        supabase.table('squads').delete().eq('id', squad_id).execute()
+        return jsonify({"message": "Squad disbanded"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ✅ UPDATED: Admin Delete Roadmap uses ID
+
 
 @app.route('/api/admin/delete_roadmap', methods=['DELETE'])
 def admin_delete_roadmap():
     try:
-        supabase.table('user_roadmaps').delete().eq(
-            'topic', request.args.get('topic')).execute()
+        roadmap_id = request.args.get('id')
+        supabase.table('user_roadmaps').delete().eq('id', roadmap_id).execute()
         return jsonify({"message": "Deleted by Admin"})
     except:
         return jsonify({"error": "Failed"}), 500

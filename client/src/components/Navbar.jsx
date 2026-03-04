@@ -1,14 +1,41 @@
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext'; // ✅ Import Theme Hook
+import { useTheme } from '../context/ThemeContext'; 
 import { useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaTrophy, FaUserShield, FaHome, FaShieldAlt, FaSun, FaMoon } from 'react-icons/fa'; // ✅ Added Sun/Moon
+import { FaUserCircle, FaTrophy, FaUserShield, FaHome, FaShieldAlt, FaSun, FaMoon } from 'react-icons/fa'; 
 import useMobile from '../hooks/useMobile';
 
 function Navbar() {
   const { user, signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme(); // ✅ Get theme state
+  const { theme, toggleTheme } = useTheme(); 
   const navigate = useNavigate();
   const isMobile = useMobile();
+
+  const isAdmin = localStorage.getItem('admin_auth') === 'true';
+
+  // ✅ THE ULTIMATE LOGOUT FIX
+  const handleLogout = async () => {
+      // 1. Remove admin status immediately
+      localStorage.removeItem('admin_auth');
+
+      // 2. MANUALLY NUKE SUPABASE TOKENS FROM THE BROWSER
+      // This forces the browser to forget the user, even if the server throws an error!
+      Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) { // Supabase stores tokens with this prefix
+              localStorage.removeItem(key);
+          }
+      });
+      sessionStorage.clear(); // Clear session storage just in case
+
+      // 3. Try to tell the server we are logging out
+      try {
+          await signOut();
+      } catch (e) {
+          console.warn("Server signout ignored, local storage is wiped.");
+      }
+
+      // 4. Force a hard refresh to the homepage to completely wipe React's memory
+      window.location.href = '/';
+  };
 
   return (
     <div style={{
@@ -26,19 +53,20 @@ function Navbar() {
           gap: isMobile ? '10px' : '20px'
       }}>
         
-        {/* ✅ Theme Toggle Button (Visible to everyone) */}
         <button onClick={toggleTheme} style={styles.navButton} title="Toggle Theme">
           {theme === 'dark' ? <FaSun size={20} color="#FFD700" /> : <FaMoon size={20} color="#64748b" />}
         </button>
 
-        {user ? (
+        {(user || isAdmin) ? (
           <>
             <button onClick={() => navigate('/')} style={styles.navButton}><FaHome size={18} color="var(--accent-green)" /> {isMobile ? '' : 'Home'}</button>
             <button onClick={() => navigate('/squads')} style={styles.navButton}><FaShieldAlt size={18} color="var(--accent-blue)" /> {isMobile ? '' : 'Squads'}</button>
             <button onClick={() => navigate('/leaderboard')} style={styles.navButton}><FaTrophy size={18} color="#FFD700" /> {isMobile ? '' : 'Leaderboard'}</button>
             <button onClick={() => navigate('/profile')} style={styles.navButton}><FaUserCircle size={18} /> {isMobile ? '' : 'Dashboard'}</button>
             <button onClick={() => navigate('/admin/login')} style={styles.navButton} title="Admin Panel"><FaUserShield size={18} color="var(--accent-red)" /></button>
-            <button onClick={() => signOut()} style={styles.logoutBtn}>Logout</button>
+            
+            {/* ✅ MUST USE THE NEW handleLogout FUNCTION HERE */}
+            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
           </>
         ) : (
           <button onClick={() => navigate('/auth')} style={styles.loginBtn}>Login</button>
@@ -48,7 +76,6 @@ function Navbar() {
   );
 }
 
-// ✅ UPDATED: Replaced hardcoded dark colors with CSS variables
 const styles = {
   nav: { 
     display: 'flex', 
