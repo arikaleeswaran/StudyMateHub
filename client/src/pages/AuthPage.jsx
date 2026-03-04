@@ -16,7 +16,6 @@ function AuthPage() {
   const navigate = useNavigate();
   const isMobile = useMobile();
 
-  // --- NEW SYNC FUNCTION ---
   const syncGuestData = async (userId) => {
     const guestDataRaw = localStorage.getItem('guest_data');
     if (!guestDataRaw) return; 
@@ -84,7 +83,6 @@ function AuthPage() {
         userId = data.user.id;
       }
 
-      // ✅ Trigger Sync
       if (userId) {
           await syncGuestData(userId);
           setTimeout(() => navigate('/profile'), 1500); 
@@ -98,17 +96,17 @@ function AuthPage() {
   };
 
   return (
-    <div style={{ width: '100vw', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', display: 'flex', flexDirection: 'column', color: 'white' }}>
+    <div style={{ width: '100vw', minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', color: 'var(--text-main)' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}><Navbar /></div>
       
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-        <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: isMobile ? '30px' : '40px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)' }}>
-          <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--card-bg)', padding: isMobile ? '30px' : '40px', borderRadius: '15px', border: '1px solid var(--card-border)', maxWidth: '400px', width: '100%', backdropFilter: 'blur(10px)' }}>
+          <h2 style={{ textAlign: 'center', marginBottom: '20px', color: 'var(--text-main)' }}>
              {isSignUp ? "Join the Hub 🚀" : "Welcome Back 👋"}
           </h2>
           
-          {error && <div style={{ background: 'rgba(220, 53, 69, 0.2)', color: '#ff6b6b', padding: '10px', borderRadius: '5px', marginBottom: '15px', fontSize: '0.9rem', textAlign: 'center' }}>{error}</div>}
-          {message && <div style={{ background: 'rgba(40, 167, 69, 0.2)', color: '#28a745', padding: '10px', borderRadius: '5px', marginBottom: '15px', fontSize: '0.9rem', textAlign: 'center' }}>{message}</div>}
+          {error && <div style={{ background: 'rgba(220, 53, 69, 0.1)', color: 'var(--accent-red)', border: '1px solid var(--accent-red)', padding: '10px', borderRadius: '5px', marginBottom: '15px', fontSize: '0.9rem', textAlign: 'center' }}>{error}</div>}
+          {message && <div style={{ background: 'rgba(40, 167, 69, 0.1)', color: 'var(--accent-green)', border: '1px solid var(--accent-green)', padding: '10px', borderRadius: '5px', marginBottom: '15px', fontSize: '0.9rem', textAlign: 'center' }}>{message}</div>}
 
           <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {isSignUp && (
@@ -145,11 +143,11 @@ function AuthPage() {
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9rem', color: '#aaa' }}>
+          <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
             {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
             <span 
               onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }} 
-              style={{ color: '#00d2ff', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: 'bold' }}
             >
               {isSignUp ? "Log In" : "Sign Up"}
             </span>
@@ -161,8 +159,8 @@ function AuthPage() {
 }
 
 const styles = {
-  input: { padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none', fontSize: '1rem' },
-  button: { padding: '12px', borderRadius: '8px', border: 'none', background: '#007bff', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', marginTop: '10px' }
+  input: { padding: '12px', borderRadius: '8px', border: '1px solid var(--card-border)', background: 'var(--card-hover)', color: 'var(--text-main)', outline: 'none', fontSize: '1rem' },
+  button: { padding: '12px', borderRadius: '8px', border: 'none', background: 'var(--accent-blue)', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', marginTop: '10px' }
 };
 
 export default AuthPage;

@@ -56,92 +56,89 @@ function AdminPage() {
   };
 
   return (
-    <div style={{ width: '100vw', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', color: 'white', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100vw', minHeight: '100vh', background: 'transparent', color: 'var(--text-main)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}><Navbar /></div>
 
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px' : '40px', width: '100%' }}>
         <h1 style={{ fontSize: isMobile ? '2rem' : '2.5rem', marginBottom: '10px' }}>⚡ Admin Command Center</h1>
-        <p style={{ color: '#aaa', marginBottom: '40px' }}>Monitor platform health, student marks, and content.</p>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '40px' }}>Monitor platform health, student marks, and content.</p>
 
         {/* --- STATS WIDGETS --- */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
             <div style={styles.card}>
-                <div style={styles.iconBox}><FaUsers size={24} color="#00d2ff"/></div>
-                <div><h3 style={{margin:0}}>{stats.users}</h3><span style={{color:'#aaa', fontSize:'0.9rem'}}>Total Users</span></div>
+                <div style={styles.iconBox}><FaUsers size={24} color="var(--accent-blue)"/></div>
+                <div><h3 style={{margin:0}}>{stats.users}</h3><span style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>Total Users</span></div>
             </div>
             <div style={styles.card}>
                 <div style={styles.iconBox}><FaMapMarkedAlt size={24} color="#ffc107"/></div>
-                <div><h3 style={{margin:0}}>{stats.roadmaps}</h3><span style={{color:'#aaa', fontSize:'0.9rem'}}>Total Roadmaps</span></div>
+                <div><h3 style={{margin:0}}>{stats.roadmaps}</h3><span style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>Total Roadmaps</span></div>
             </div>
             <div style={styles.card}>
-                <div style={styles.iconBox}><FaSmile size={24} color="#28a745"/></div>
-                <div><h3 style={{margin:0}}>{stats.satisfaction}%</h3><span style={{color:'#aaa', fontSize:'0.9rem'}}>Global Satisfaction</span></div>
+                <div style={styles.iconBox}><FaSmile size={24} color="var(--accent-green)"/></div>
+                <div><h3 style={{margin:0}}>{stats.satisfaction}%</h3><span style={{color:'var(--text-muted)', fontSize:'0.9rem'}}>Global Satisfaction</span></div>
             </div>
         </div>
 
         {/* --- TABS --- */}
-        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid rgba(255,255,255,0.1)', overflowX: 'auto'}}>
-            <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, borderBottom: activeTab === 'dashboard' ? '3px solid #00d2ff' : 'none', color: activeTab==='dashboard'?'#00d2ff':'#aaa', whiteSpace: 'nowrap'}}>Recent Roadmaps</button>
-            <button onClick={() => setActiveTab('students')} style={{...styles.tab, borderBottom: activeTab === 'students' ? '3px solid #00d2ff' : 'none', color: activeTab==='students'?'#00d2ff':'#aaa', whiteSpace: 'nowrap'}}>Student Marks</button>
-            <button onClick={() => setActiveTab('feedback')} style={{...styles.tab, borderBottom: activeTab === 'feedback' ? '3px solid #00d2ff' : 'none', color: activeTab==='feedback'?'#00d2ff':'#aaa', whiteSpace: 'nowrap'}}>User Feedback</button>
+        <div style={{display:'flex', gap:'20px', marginBottom:'30px', borderBottom:'1px solid var(--card-border)', overflowX: 'auto'}}>
+            <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, borderBottom: activeTab === 'dashboard' ? '3px solid var(--accent-blue)' : 'none', color: activeTab==='dashboard'?'var(--accent-blue)':'var(--text-muted)', whiteSpace: 'nowrap'}}>Recent Roadmaps</button>
+            <button onClick={() => setActiveTab('students')} style={{...styles.tab, borderBottom: activeTab === 'students' ? '3px solid var(--accent-blue)' : 'none', color: activeTab==='students'?'var(--accent-blue)':'var(--text-muted)', whiteSpace: 'nowrap'}}>Student Marks</button>
+            <button onClick={() => setActiveTab('feedback')} style={{...styles.tab, borderBottom: activeTab === 'feedback' ? '3px solid var(--accent-blue)' : 'none', color: activeTab==='feedback'?'var(--accent-blue)':'var(--text-muted)', whiteSpace: 'nowrap'}}>User Feedback</button>
         </div>
 
         {/* --- CONTENT AREA --- */}
         {loading ? <div className="spinner"></div> : (
             <>
-                {/* 1. ROADMAPS TAB */}
                 {activeTab === 'dashboard' && (
                     <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                         {roadmaps.map((map, i) => (
                             <div key={i} style={styles.listItem}>
                                 <div>
                                     <h4 style={{margin:'0 0 5px 0'}}>{map.topic}</h4>
-                                    <span style={{fontSize:'0.8rem', color:'#666'}}>ID: {map.id} • Created: {new Date(map.created_at).toLocaleDateString()}</span>
+                                    <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>ID: {map.id} • Created: {new Date(map.created_at).toLocaleDateString()}</span>
                                 </div>
                                 <button onClick={() => handleDeleteRoadmap(map.topic)} style={styles.deleteBtn}><FaTrash/> Delete</button>
                             </div>
                         ))}
-                        {roadmaps.length === 0 && <p style={{color:'#666'}}>No roadmaps found.</p>}
+                        {roadmaps.length === 0 && <p style={{color:'var(--text-muted)'}}>No roadmaps found.</p>}
                     </div>
                 )}
 
-                {/* 2. STUDENT MARKS TAB */}
                 {activeTab === 'students' && (
                     <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                         {students.map((student, i) => (
                             <div key={i} style={styles.listItem}>
                                 <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                                    <div style={{width:'40px', height:'40px', background:'#e3f2fd', color:'#007bff', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', fontWeight:'bold'}}>
+                                    <div style={{width:'40px', height:'40px', background:'rgba(0, 123, 255, 0.1)', color:'var(--accent-blue)', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', fontWeight:'bold'}}>
                                         {i + 1}
                                     </div>
                                     <div>
                                         <h4 style={{margin:'0 0 5px 0'}}>{student.full_name || "Anonymous Scholar"}</h4>
-                                        <span style={{fontSize:'0.8rem', color:'#aaa'}}>User ID: {student.user_id.slice(0, 8)}...</span>
+                                        <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>User ID: {student.user_id.slice(0, 8)}...</span>
                                     </div>
                                 </div>
                                 <div style={{textAlign:'right'}}>
                                     <h3 style={{margin:0, color:'#ffc107'}}>{student.score} pts</h3>
-                                    <span style={{fontSize:'0.8rem', color:'#666'}}>Total Marks</span>
+                                    <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>Total Marks</span>
                                 </div>
                             </div>
                         ))}
-                        {students.length === 0 && <p style={{color:'#666'}}>No students registered yet.</p>}
+                        {students.length === 0 && <p style={{color:'var(--text-muted)'}}>No students registered yet.</p>}
                     </div>
                 )}
 
-                {/* 3. FEEDBACK TAB */}
                 {activeTab === 'feedback' && (
                     <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'20px'}}>
                         {feedbacks.map((item, i) => (
                             <div key={i} style={{...styles.card, display:'block'}}>
                                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
-                                    <span style={{fontWeight:'bold', color:'#00d2ff'}}>{item.topic}</span>
-                                    <span style={{fontSize:'0.8rem', color: item.sentiment_score > 0 ? '#28a745' : '#dc3545'}}>
+                                    <span style={{fontWeight:'bold', color:'var(--accent-blue)'}}>{item.topic}</span>
+                                    <span style={{fontSize:'0.8rem', color: item.sentiment_score > 0 ? 'var(--accent-green)' : 'var(--accent-red)'}}>
                                         {item.sentiment_score > 0 ? "Positive" : "Negative"}
                                     </span>
                                 </div>
                                 <p style={{fontSize:'0.95rem', lineHeight:'1.5', margin:'0 0 10px 0'}}>"{item.feedback_text}"</p>
-                                <span style={{fontSize:'0.8rem', color:'#666'}}>- {item.node_label}</span>
+                                <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>- {item.node_label}</span>
                             </div>
                         ))}
                     </div>
@@ -154,11 +151,11 @@ function AdminPage() {
 }
 
 const styles = {
-    card: { background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', display:'flex', alignItems:'center', gap:'15px' },
-    iconBox: { width:'50px', height:'50px', borderRadius:'12px', background:'rgba(255,255,255,0.05)', display:'flex', justifyContent:'center', alignItems:'center' },
+    card: { background: 'var(--card-bg)', padding: '20px', borderRadius: '15px', border: '1px solid var(--card-border)', display:'flex', alignItems:'center', gap:'15px' },
+    iconBox: { width:'50px', height:'50px', borderRadius:'12px', background:'var(--card-hover)', display:'flex', justifyContent:'center', alignItems:'center' },
     tab: { background:'none', border:'none', padding:'10px 20px', cursor:'pointer', fontWeight:'bold', fontSize:'1rem' },
-    listItem: { background: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '10px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid rgba(255,255,255,0.05)' },
-    deleteBtn: { background: 'rgba(220, 53, 69, 0.2)', color: '#dc3545', border: '1px solid #dc3545', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', display:'flex', alignItems:'center', gap:'5px' }
+    listItem: { background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '20px', borderRadius: '10px', display:'flex', justifyContent:'space-between', alignItems:'center' },
+    deleteBtn: { background: 'rgba(220, 53, 69, 0.1)', color: 'var(--accent-red)', border: '1px solid var(--accent-red)', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', display:'flex', alignItems:'center', gap:'5px' }
 };
 
 export default AdminPage;

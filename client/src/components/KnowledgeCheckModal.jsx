@@ -1,5 +1,5 @@
 import React from 'react';
-import useMobile from '../hooks/useMobile'; // ✅ Import Hook
+import useMobile from '../hooks/useMobile'; 
 
 function KnowledgeCheckModal({ nodeLabel, onYes, onNo }) {
   const isMobile = useMobile();
@@ -7,11 +7,13 @@ function KnowledgeCheckModal({ nodeLabel, onYes, onNo }) {
   return (
     <div style={{
         position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-        background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', 
+        background: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', 
         zIndex: 1000, backdropFilter: 'blur(5px)', padding: '20px'
     }}>
       <div style={{
-          background: 'white',
+          background: 'var(--card-bg)',
+          color: 'var(--text-main)',
+          border: '1px solid var(--card-border)',
           padding: isMobile ? '25px' : '40px',
           borderRadius: '20px',
           maxWidth: '450px',
@@ -22,23 +24,23 @@ function KnowledgeCheckModal({ nodeLabel, onYes, onNo }) {
       }}>
         <div style={{ fontSize: isMobile ? '2.5rem' : '3.5rem', marginBottom: '15px' }}>🤔</div>
         
-        <h2 style={{ margin: '0 0 15px 0', color: '#333', fontSize: isMobile ? '1.5rem' : '2rem' }}>Quick Check</h2>
+        <h2 style={{ margin: '0 0 15px 0', color: 'var(--text-main)', fontSize: isMobile ? '1.5rem' : '2rem' }}>Quick Check</h2>
         
-        <p style={{ fontSize: isMobile ? '1rem' : '1.1rem', color: '#555', marginBottom: '30px', lineHeight: '1.6' }}>
-          Have you studied <strong style={{color: '#007bff'}}>{nodeLabel}</strong> before?
+        <p style={{ fontSize: isMobile ? '1rem' : '1.1rem', color: 'var(--text-muted)', marginBottom: '30px', lineHeight: '1.6' }}>
+          Have you studied <strong style={{color: 'var(--accent-blue)'}}>{nodeLabel}</strong> before?
         </p>
         
         <div style={{ display: 'flex', gap: '15px', flexDirection: isMobile ? 'column' : 'row' }}>
           <button onClick={onYes} style={{
               flex: 1, padding: '15px', border: 'none', borderRadius: '10px',
-              background: '#28a745', color: 'white', fontSize: '1rem', fontWeight: 'bold',
+              background: 'var(--accent-green)', color: 'white', fontSize: '1rem', fontWeight: 'bold',
               cursor: 'pointer', boxShadow: '0 4px 15px rgba(40, 167, 69, 0.3)', transition: 'transform 0.2s'
           }}>
             Yes, I know it
           </button>
           <button onClick={onNo} style={{
               flex: 1, padding: '15px', border: 'none', borderRadius: '10px',
-              background: '#007bff', color: 'white', fontSize: '1rem', fontWeight: 'bold',
+              background: 'var(--accent-blue)', color: 'white', fontSize: '1rem', fontWeight: 'bold',
               cursor: 'pointer', boxShadow: '0 4px 15px rgba(0, 123, 255, 0.3)', transition: 'transform 0.2s'
           }}>
             No, I'm new

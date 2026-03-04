@@ -11,10 +11,8 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
   const currentCard = cards[currentIndex];
 
   const handleRate = async (quality) => {
-    // 1. Update Backend
     await onReviewUpdate(currentCard.id, quality, currentCard.interval_days);
     
-    // 2. Move to next
     setIsFlipped(false);
     if (currentIndex + 1 < cards.length) {
         setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
@@ -27,12 +25,12 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
     return (
         <div className="modal-overlay" style={{
             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000
+            background: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000
         }}>
             <div style={{...styles.card, width: isMobile ? '90%' : '400px'}}>
-                <FaBrain size={50} color="#28a745" />
-                <h2 style={{color:'black'}}>All Caught Up! 🎉</h2>
-                <p style={{color:'#666'}}>You've reviewed all your due flashcards.</p>
+                <FaBrain size={50} color="var(--accent-green)" />
+                <h2 style={{color:'var(--text-main)'}}>All Caught Up! 🎉</h2>
+                <p style={{color:'var(--text-muted)'}}>You've reviewed all your due flashcards.</p>
                 <button onClick={onClose} style={styles.closeBtn}>Close</button>
             </div>
         </div>
@@ -42,17 +40,15 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
   return (
     <div className="modal-overlay" style={{
         position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-        background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000
+        background: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000
     }}>
       <div style={{...styles.container, width: isMobile ? '90%' : '500px'}}>
         
-        {/* Header */}
         <div style={{display:'flex', justifyContent:'space-between', marginBottom:'20px', color:'white'}}>
             <span>🧠 Reviewing: {currentCard.topic}</span>
             <button onClick={onClose} style={{background:'none', border:'none', color:'white', cursor:'pointer'}}><FaTimes size={20}/></button>
         </div>
 
-        {/* Card */}
         <div 
             onClick={() => setIsFlipped(!isFlipped)} 
             style={{
@@ -71,8 +67,8 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
                 </div>
 
                 {/* Back */}
-                <div style={{...styles.face, background: '#fff', color:'#333', transform: 'rotateY(180deg)'}}>
-                    <span style={{fontSize:'0.9rem', color:'#555', position:'absolute', top:'20px'}}>BACK</span>
+                <div style={{...styles.face, background: 'var(--card-bg)', color:'var(--text-main)', border: '1px solid var(--card-border)', transform: 'rotateY(180deg)'}}>
+                    <span style={{fontSize:'0.9rem', color:'var(--text-muted)', position:'absolute', top:'20px'}}>BACK</span>
                     <p style={{fontSize:'1.3rem', textAlign:'center', padding:'20px', lineHeight:'1.6'}}>{currentCard.back}</p>
                 </div>
             </div>
@@ -81,15 +77,15 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
         {/* Controls */}
         {isFlipped ? (
             <div style={{display:'flex', gap:'10px', justifyContent:'center'}}>
-                <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} style={{...styles.btn, background:'#dc3545'}}>Hard (1d)</button>
+                <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} style={{...styles.btn, background:'var(--accent-red)'}}>Hard (1d)</button>
                 <button onClick={(e) => { e.stopPropagation(); handleRate('medium'); }} style={{...styles.btn, background:'#ffc107', color:'#000'}}>Good (Wait)</button>
-                <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} style={{...styles.btn, background:'#28a745'}}>Easy (Later)</button>
+                <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} style={{...styles.btn, background:'var(--accent-green)'}}>Easy (Later)</button>
             </div>
         ) : (
-            <button onClick={() => setIsFlipped(true)} style={{...styles.btn, width:'100%', background:'#007bff'}}>Show Answer</button>
+            <button onClick={() => setIsFlipped(true)} style={{...styles.btn, width:'100%', background:'var(--accent-blue)'}}>Show Answer</button>
         )}
         
-        <div style={{textAlign:'center', marginTop:'20px', color:'#aaa'}}>{currentIndex + 1} / {cards.length}</div>
+        <div style={{textAlign:'center', marginTop:'20px', color:'white'}}>{currentIndex + 1} / {cards.length}</div>
       </div>
     </div>
   );
@@ -97,14 +93,14 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
 
 const styles = {
     container: { background: 'none', display: 'flex', flexDirection: 'column' },
-    card: { background: 'white', padding: '40px', borderRadius: '20px', textAlign: 'center' },
+    card: { background: 'var(--card-bg)', border: '1px solid var(--card-border)', padding: '40px', borderRadius: '20px', textAlign: 'center' },
     face: { 
         position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden', 
         borderRadius: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 10px 30px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)'
     },
     btn: { padding: '15px 20px', border: 'none', borderRadius: '10px', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', flex: 1 },
-    closeBtn: { marginTop: '20px', padding: '10px 20px', background: '#333', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }
+    closeBtn: { marginTop: '20px', padding: '10px 20px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }
 };
 
 export default FlashcardModal;
