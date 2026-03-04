@@ -108,10 +108,10 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
     return (
         <div className="modal-overlay" style={{ flexDirection: 'column' }}>
             <div className="spinner"></div>
-            <h3 style={{color:'white', marginTop:'20px', fontWeight: '300'}}>
+            <h3 style={{color:'var(--text-main)', marginTop:'20px', fontWeight: '300'}}>
                 Generating {questionCount === 5 ? "Quick Check" : "Advanced Assessment"} ({questionCount} Qs)... 🧠
             </h3>
-            <button onClick={onClose} style={{marginTop:'20px', background:'none', border:'1px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 20px', borderRadius:'20px', cursor:'pointer'}}>Cancel</button>
+            <button onClick={onClose} style={{marginTop:'20px', background:'none', border:'1px solid var(--card-border)', color:'var(--text-main)', padding:'8px 20px', borderRadius:'20px', cursor:'pointer'}}>Cancel</button>
         </div>
     );
   }
@@ -120,48 +120,47 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
       const isSelected = selectedOption === index;
       const isCorrect = index === questions[currentQ].correct_answer;
       
-      if (!isAnswered) return { background: 'white', border: '1px solid #ddd', color: '#333' };
+      if (!isAnswered) return { background: 'var(--card-bg)', border: '1px solid var(--card-border)', color: 'var(--text-main)' };
       
       if (isSelected) {
           if (isCorrect) return { background: '#d4edda', border: '1px solid #28a745', color: '#155724' }; 
           return { background: '#f8d7da', border: '1px solid #dc3545', color: '#721c24' }; 
       }
       
-      return { background: '#f9f9f9', border: '1px solid #eee', color: '#aaa', opacity: 0.6 }; 
+      return { background: 'var(--card-hover)', border: '1px solid var(--card-border)', color: 'var(--text-muted)', opacity: 0.6 }; 
   };
 
-  // ✅ NEW: Simple validation (must be at least 3 characters long)
   const isFeedbackValid = feedbackText.trim().length >= 3;
 
   return (
     <div className="modal-overlay">
       <div className="modal-card" style={{ 
           maxWidth: '750px', width: '95%', maxHeight: '90vh', padding: '0', 
-          overflowY: 'auto', textAlign:'left', borderRadius: '15px', background: 'white', position: 'relative'
+          overflowY: 'auto', textAlign:'left', borderRadius: '15px', background: 'var(--card-bg)', color: 'var(--text-main)', position: 'relative'
       }}>
         
         {!quizFinished ? (
           <>
-            <div style={{ padding: '20px 30px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
+            <div style={{ padding: '20px 30px', background: 'var(--nav-bg)', borderBottom: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
                 <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                    <h3 style={{ margin: 0, color: '#333', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
+                    <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.1rem' }}>📝 {questionCount === 5 ? "Diagnostic" : "Exam Mode"}: {subTopic}</h3>
                 </div>
                 <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#007bff', background: '#e3f2fd', padding: '4px 10px', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--accent-blue)', background: 'var(--card-hover)', padding: '4px 10px', borderRadius: '12px' }}>
                         Q{currentQ + 1}/{questions.length}
                     </span>
-                    <button onClick={handleExitClick} style={{ background: '#dc3545', border: 'none', color: 'white', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', title: 'Quit Test' }}>
+                    <button onClick={handleExitClick} style={{ background: 'var(--accent-red)', border: 'none', color: 'white', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', title: 'Quit Test' }}>
                         <FaTimes size={14}/>
                     </button>
                 </div>
             </div>
             
-            <div style={{ width: '100%', height: '6px', background: '#eee', position: 'sticky', top: '60px', zIndex: 9 }}>
-                <div style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, height: '100%', background: '#007bff', transition: 'width 0.3s ease' }}></div>
+            <div style={{ width: '100%', height: '6px', background: 'var(--card-border)', position: 'sticky', top: '60px', zIndex: 9 }}>
+                <div style={{ width: `${((currentQ + 1) / questions.length) * 100}%`, height: '100%', background: 'var(--accent-blue)', transition: 'width 0.3s ease' }}></div>
             </div>
 
             <div style={{ padding: '30px' }}>
-                <div style={{ fontSize: '1.1rem', marginBottom: '25px', lineHeight: '1.6', color:'#222', fontWeight:'500' }}>
+                <div style={{ fontSize: '1.1rem', marginBottom: '25px', lineHeight: '1.6', color:'var(--text-main)', fontWeight:'500' }}>
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                         {questions[currentQ].question}
                     </ReactMarkdown>
@@ -196,10 +195,10 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                 </div>
             </div>
 
-            <div style={{ height: '80px', padding: '0 30px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', background: 'white', borderTop: '1px solid #eee' }}>
+            <div style={{ height: '80px', padding: '0 30px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', background: 'var(--nav-bg)', borderTop: '1px solid var(--card-border)' }}>
                 {isAnswered && (
                     <button onClick={handleNext} style={{
-                        padding: '12px 30px', background: '#007bff', color: 'white', border: 'none', borderRadius: '30px',
+                        padding: '12px 30px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '30px',
                         fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
                         boxShadow: '0 4px 12px rgba(0,123,255,0.3)', animation: 'fadeIn 0.3s'
                     }}>
@@ -214,11 +213,11 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                 {hasPassed ? "🏆" : "⚠️"}
             </div>
             
-            <h1 style={{ margin: '0 0 10px 0', color: hasPassed ? '#28a745' : '#dc3545' }}>
+            <h1 style={{ margin: '0 0 10px 0', color: hasPassed ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                 {hasPassed ? "Passed!" : "Assessment Failed"}
             </h1>
             
-            <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '20px' }}>
+            <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
                 You scored <strong>{score} / {questions.length}</strong>.
                 <br/>
                 {hasPassed ? "Excellent work! Knowledge verified." : "Review the material and try again."}
@@ -245,14 +244,13 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
 
             {hasPassed ? (
                 <div>
-                     {/* ✅ UPDATED: Mandatory feedback UI */}
-                     <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>
-                         Required Feedback <span style={{color: 'red'}}>*</span>
+                     <label style={{ display: 'block', textAlign: 'left', fontWeight: 'bold', marginBottom: '10px', color: 'var(--text-muted)' }}>
+                         Required Feedback <span style={{color: 'var(--accent-red)'}}>*</span>
                      </label>
                      <textarea 
                         value={feedbackText} 
                         onChange={(e) => setFeedbackText(e.target.value)} 
-                        style={{ width: '100%', height: '60px', padding: '10px', marginBottom:'15px', borderRadius:'5px', border: isFeedbackValid ? '1px solid #28a745' : '1px solid #ccc' }} 
+                        style={{ width: '100%', height: '60px', padding: '10px', marginBottom:'15px', borderRadius:'5px', border: isFeedbackValid ? '1px solid var(--accent-green)' : '1px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-main)' }} 
                         placeholder="Was this topic easy or hard? Your review helps others! (Min 3 chars)"
                      />
                      
@@ -262,8 +260,8 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
                         style={{ 
                             width: '100%', 
                             padding: '15px', 
-                            background: isFeedbackValid ? '#28a745' : '#e9ecef', 
-                            color: isFeedbackValid ? 'white' : '#aaa', 
+                            background: isFeedbackValid ? 'var(--accent-green)' : 'var(--card-hover)', 
+                            color: isFeedbackValid ? 'white' : 'var(--text-muted)', 
                             border: 'none', 
                             borderRadius: '8px', 
                             cursor: isFeedbackValid ? 'pointer' : 'not-allowed', 
@@ -278,14 +276,14 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems:'center' }}>
                     <div style={{display:'flex', gap:'10px', width:'100%', flexDirection: 'column'}}> 
-                        <button onClick={handleFailAndReview} style={{ padding: '15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%', fontSize:'1.1rem' }}>
+                        <button onClick={handleFailAndReview} style={{ padding: '15px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%', fontSize:'1.1rem' }}>
                             Review Resources 📚
                         </button>
-                        <button onClick={handleRetakeSelf} style={{ padding: '12px', background: '#e9ecef', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
+                        <button onClick={handleRetakeSelf} style={{ padding: '12px', background: 'var(--card-hover)', color: 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold', width: '100%' }}>
                             🔄 Retake
                         </button>
                     </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer', marginTop:'10px' }}>
                         Close & Discard Results
                     </button>
                 </div>
@@ -296,28 +294,28 @@ function AssessmentModal({ mainTopic, subTopic, history = "", questionCount = 10
         {showExitConfirm && (
             <div style={{
                 position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                background: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center',
                 zIndex: 20, borderRadius: '15px', backdropFilter: 'blur(5px)', flexDirection: 'column', padding: '20px', textAlign: 'center',
                 animation: 'fadeIn 0.2s'
             }}>
-                <div style={{ background: '#1e293b', padding: '30px', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '350px', width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+                <div style={{ background: 'var(--card-bg)', padding: '30px', borderRadius: '15px', border: '1px solid var(--card-border)', maxWidth: '350px', width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
                     <div style={{marginBottom:'20px'}}>
-                        <FaExclamationTriangle size={40} color="#ff6b6b" />
+                        <FaExclamationTriangle size={40} color="var(--accent-red)" />
                     </div>
-                    <h2 style={{margin:'0 0 10px 0', color:'white', fontSize:'1.5rem'}}>Quit Assessment?</h2>
-                    <p style={{color:'#94a3b8', marginBottom:'25px', lineHeight:'1.5', fontSize:'1rem'}}>
+                    <h2 style={{margin:'0 0 10px 0', color:'var(--text-main)', fontSize:'1.5rem'}}>Quit Assessment?</h2>
+                    <p style={{color:'var(--text-muted)', marginBottom:'25px', lineHeight:'1.5', fontSize:'1rem'}}>
                        Are you sure you want to leave? <br/>
-                       <span style={{color:'#ff6b6b', fontWeight:'bold'}}>Your progress will not be saved.</span>
+                       <span style={{color:'var(--accent-red)', fontWeight:'bold'}}>Your progress will not be saved.</span>
                     </p>
                     <div style={{display:'flex', gap:'15px', justifyContent:'center'}}>
                         <button onClick={cancelQuit} style={{
-                            flex: 1, padding:'12px', background:'rgba(255,255,255,0.1)', color:'white', 
-                            border:'1px solid rgba(255,255,255,0.2)', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', transition: 'background 0.2s'
+                            flex: 1, padding:'12px', background:'var(--card-hover)', color:'var(--text-main)', 
+                            border:'1px solid var(--card-border)', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', transition: 'background 0.2s'
                         }}>
                             Cancel
                         </button>
                         <button onClick={confirmQuit} style={{
-                            flex: 1, padding:'12px', background:'#dc3545', color:'white', 
+                            flex: 1, padding:'12px', background:'var(--accent-red)', color:'white', 
                             border:'none', borderRadius:'8px', fontWeight:'bold', cursor:'pointer', boxShadow: '0 4px 12px rgba(220, 53, 69, 0.4)'
                         }}>
                             Yes, Quit

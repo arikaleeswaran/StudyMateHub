@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // ✅ Import hook
+import { useNavigate } from 'react-router-dom'; 
 import Navbar from '../components/Navbar';
-import { FaTrophy, FaMedal, FaCrown, FaArrowLeft } from 'react-icons/fa'; // ✅ Import Arrow Icon
+import { FaTrophy, FaMedal, FaCrown, FaArrowLeft } from 'react-icons/fa'; 
 import useMobile from '../hooks/useMobile';
 
 function LeaderboardPage() {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useMobile();
-  const navigate = useNavigate(); // ✅ Initialize hook
+  const navigate = useNavigate(); 
 
   useEffect(() => {
     const fetchLeaders = async () => {
@@ -27,33 +27,31 @@ function LeaderboardPage() {
   }, []);
 
   const getRankStyle = (index) => {
-      if (index === 0) return { icon: <FaCrown size={24} color="#FFD700"/>, color: '#FFD700', bg: 'rgba(255, 215, 0, 0.2)' }; 
-      if (index === 1) return { icon: <FaMedal size={24} color="#C0C0C0"/>, color: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.2)' }; 
-      if (index === 2) return { icon: <FaMedal size={24} color="#CD7F32"/>, color: '#CD7F32', bg: 'rgba(205, 127, 50, 0.2)' }; 
-      return { icon: <span style={{fontWeight:'bold', fontSize:'1.2rem'}}>#{index + 1}</span>, color: 'white', bg: 'rgba(255,255,255,0.05)' };
+      if (index === 0) return { icon: <FaCrown size={24} color="#FFD700"/>, color: '#FFD700', bg: 'rgba(255, 215, 0, 0.1)' }; 
+      if (index === 1) return { icon: <FaMedal size={24} color="#C0C0C0"/>, color: '#C0C0C0', bg: 'rgba(192, 192, 192, 0.1)' }; 
+      if (index === 2) return { icon: <FaMedal size={24} color="#CD7F32"/>, color: '#CD7F32', bg: 'rgba(205, 127, 50, 0.1)' }; 
+      return { icon: <span style={{fontWeight:'bold', fontSize:'1.2rem'}}>#{index + 1}</span>, color: 'var(--text-main)', bg: 'var(--card-bg)' };
   };
 
   return (
-    <div style={{ width: '100vw', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', color: 'white', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100vw', minHeight: '100vh', background: 'transparent', color: 'var(--text-main)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}><Navbar /></div>
 
       <div style={{ maxWidth: '800px', margin: isMobile ? '20px auto' : '40px auto', padding: '20px', width: '90%' }}>
         
-        {/* ✅ BACK BUTTON START */}
         <button 
             onClick={() => navigate(-1)} 
             style={{
-                background: 'none', border: 'none', color: '#aaa', fontSize: '1rem', 
+                background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1rem', 
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px'
             }}
         >
             <FaArrowLeft /> Back
         </button>
-        {/* ✅ BACK BUTTON END */}
 
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <h1 style={{ fontSize: isMobile ? '2rem' : '3rem', margin: '0 0 10px 0' }}>🏆 Hall of Fame</h1>
-            <p style={{ color: '#aaa', fontSize: isMobile ? '1rem' : '1.2rem' }}>Top students mastering the tech world.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: isMobile ? '1rem' : '1.2rem' }}>Top students mastering the tech world.</p>
         </div>
 
         {loading ? <div className="spinner"></div> : (
@@ -64,8 +62,8 @@ function LeaderboardPage() {
                         <div key={user.user_id} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             background: style.bg, padding: '20px', borderRadius: '15px',
-                            border: `1px solid ${style.color}`,
-                            boxShadow: `0 4px 15px ${style.bg}`,
+                            border: `1px solid ${index < 3 ? style.color : 'var(--card-border)'}`,
+                            boxShadow: `0 4px 15px rgba(0,0,0,0.05)`,
                             transition: 'transform 0.2s',
                             flexDirection: 'row'
                         }}>
@@ -73,7 +71,7 @@ function LeaderboardPage() {
                                 <div style={{ width: '50px', textAlign: 'center' }}>{style.icon}</div>
                                 <div>
                                     <h3 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.2rem' }}>{user.full_name}</h3>
-                                    <span style={{ fontSize: '0.9rem', color: '#aaa' }}>{index < 3 ? "Top Performer" : "Rising Star"}</span>
+                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{index < 3 ? "Top Performer" : "Rising Star"}</span>
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -82,7 +80,7 @@ function LeaderboardPage() {
                         </div>
                     );
                 })}
-                {leaders.length === 0 && <p style={{textAlign:'center', color:'#666'}}>No champions yet. Be the first!</p>}
+                {leaders.length === 0 && <p style={{textAlign:'center', color:'var(--text-muted)'}}>No champions yet. Be the first!</p>}
             </div>
         )}
       </div>

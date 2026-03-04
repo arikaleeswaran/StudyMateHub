@@ -1,21 +1,23 @@
 import React from 'react';
 import { FaExclamationTriangle } from 'react-icons/fa';
-import useMobile from '../hooks/useMobile'; // ✅ Import Hook
+import useMobile from '../hooks/useMobile'; 
 
 function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
   if (!isOpen) return null;
   
-  const isMobile = useMobile(); // ✅ Use Hook
+  const isMobile = useMobile(); 
 
   return (
     <div className="modal-overlay" style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-      background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
+      background: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
       backdropFilter: 'blur(3px)',
-      padding: '20px' // Prevent touching edges
+      padding: '20px' 
     }}>
       <div style={{
-        background: 'white', 
+        background: 'var(--card-bg)', 
+        color: 'var(--text-main)',
+        border: '1px solid var(--card-border)',
         padding: isMobile ? '20px' : '30px', 
         borderRadius: '15px', 
         maxWidth: '400px', 
@@ -25,19 +27,19 @@ function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
         animation: 'popIn 0.2s ease-out'
       }}>
         
-        <div style={{ fontSize: isMobile ? '2.5rem' : '3rem', color: '#dc3545', marginBottom: '15px' }}>
+        <div style={{ fontSize: isMobile ? '2.5rem' : '3rem', color: 'var(--accent-red)', marginBottom: '15px' }}>
             <FaExclamationTriangle />
         </div>
         
-        <h2 style={{ margin: '0 0 10px 0', color: '#333', fontSize: isMobile ? '1.2rem' : '1.5rem' }}>{title}</h2>
+        <h2 style={{ margin: '0 0 10px 0', color: 'var(--text-main)', fontSize: isMobile ? '1.2rem' : '1.5rem' }}>{title}</h2>
         
-        <p style={{ color: '#666', marginBottom: '25px', lineHeight: '1.5', fontSize: isMobile ? '0.9rem' : '1rem' }}>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '25px', lineHeight: '1.5', fontSize: isMobile ? '0.9rem' : '1rem' }}>
             {message}
         </p>
         
         <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexDirection: isMobile ? 'column' : 'row' }}>
             <button onClick={onCancel} style={{
-                padding: '12px 25px', border: '1px solid #ddd', background: 'white', color: '#555',
+                padding: '12px 25px', border: '1px solid var(--card-border)', background: 'var(--card-hover)', color: 'var(--text-main)',
                 borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'all 0.2s',
                 width: isMobile ? '100%' : 'auto'
             }}>
@@ -45,7 +47,7 @@ function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
             </button>
             
             <button onClick={onConfirm} style={{
-                padding: '12px 25px', border: 'none', background: '#dc3545', color: 'white',
+                padding: '12px 25px', border: 'none', background: 'var(--accent-red)', color: 'white',
                 borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem',
                 boxShadow: '0 4px 10px rgba(220, 53, 69, 0.3)', transition: 'all 0.2s',
                 width: isMobile ? '100%' : 'auto'

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaUserShield, FaLock, FaArrowLeft } from 'react-icons/fa'; // ✅ Import Icon
+import { FaUserShield, FaLock, FaArrowLeft } from 'react-icons/fa'; 
 import useMobile from '../hooks/useMobile';
 
 function AdminLoginPage() {
@@ -27,27 +27,26 @@ function AdminLoginPage() {
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#0f172a', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', fontFamily: 'Segoe UI' }}>
-      <div style={{ width: '100%', maxWidth: '400px', padding: isMobile ? '30px' : '40px', margin: '20px', background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '15px', backdropFilter: 'blur(10px)', textAlign: 'center' }}>
-        <div style={{ marginBottom: '20px' }}><FaUserShield size={50} color="#00d2ff" /></div>
+    <div style={{ width: '100vw', height: '100vh', background: 'transparent', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main)', fontFamily: 'Segoe UI' }}>
+      <div style={{ width: '100%', maxWidth: '400px', padding: isMobile ? '30px' : '40px', margin: '20px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '15px', backdropFilter: 'blur(10px)', textAlign: 'center' }}>
+        <div style={{ marginBottom: '20px' }}><FaUserShield size={50} color="var(--accent-blue)" /></div>
         <h2 style={{ marginBottom: '5px' }}>Admin Protocol</h2>
-        <p style={{ color: '#64748b', marginBottom: '30px' }}>Restricted Access Only</p>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Restricted Access Only</p>
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div style={styles.inputGroup}>
-            <FaUserShield color="#aaa" />
+            <FaUserShield color="var(--text-muted)" />
             <input type="email" placeholder="Admin ID" value={email} onChange={(e) => setEmail(e.target.value)} style={styles.input} required />
           </div>
           <div style={styles.inputGroup}>
-            <FaLock color="#aaa" />
+            <FaLock color="var(--text-muted)" />
             <input type="password" placeholder="Passcode" value={password} onChange={(e) => setPassword(e.target.value)} style={styles.input} required />
           </div>
-          {error && <p style={{ color: '#ff4444', fontSize: '0.9rem' }}>{error}</p>}
+          {error && <p style={{ color: 'var(--accent-red)', fontSize: '0.9rem' }}>{error}</p>}
           <button type="submit" style={styles.button}>Authenticate</button>
         </form>
         
-        {/* ✅ Updated Back Button */}
-        <button onClick={() => navigate(-1)} style={{ marginTop: '20px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%' }}>
+        <button onClick={() => navigate(-1)} style={{ marginTop: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%' }}>
             <FaArrowLeft size={12}/> Go Back
         </button>
       </div>
@@ -56,8 +55,8 @@ function AdminLoginPage() {
 }
 
 const styles = {
-  inputGroup: { display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' },
-  input: { background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%', fontSize: '1rem' },
+  inputGroup: { display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--card-hover)', padding: '12px', borderRadius: '8px', border: '1px solid var(--card-border)' },
+  input: { background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', width: '100%', fontSize: '1rem' },
   button: { padding: '12px', borderRadius: '8px', border: 'none', background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', marginTop: '10px' }
 };
 
