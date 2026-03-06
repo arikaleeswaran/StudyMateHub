@@ -11,7 +11,7 @@ function AdminPage() {
   const [roadmaps, setRoadmaps] = useState([]);
   const [feedbacks, setFeedbacks] = useState([]);
   const [students, setStudents] = useState([]);
-  const [squads, setSquads] = useState([]); // ✅ Added squads state
+  const [squads, setSquads] = useState([]); 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const isMobile = useMobile();
@@ -42,7 +42,7 @@ function AdminPage() {
         const usersRes = await axios.get(`${baseUrl}/api/admin/users`);
         setStudents(usersRes.data);
 
-        // ✅ Fetch squads
+    
         const squadsRes = await axios.get(`${baseUrl}/api/admin/squads`);
         setSquads(squadsRes.data);
 
@@ -60,7 +60,7 @@ function AdminPage() {
       } catch(e) { alert("Failed to delete"); }
   };
 
-  // ✅ NEW: Hide User Logic
+  
   const handleToggleHideUser = async (userId, currentStatus) => {
       const action = currentStatus ? "unhide" : "hide (shadowban)";
       if(!confirm(`⚠️ Admin Action: Are you sure you want to ${action} this user from the public leaderboard?`)) return;
@@ -71,7 +71,7 @@ function AdminPage() {
       } catch(e) { alert("Failed to update user status"); }
   };
 
-  // ✅ NEW: Delete User Logic
+
   const handleDeleteUser = async (userId) => {
       if(!confirm("🛑 CRITICAL ACTION: This will permanently wipe all scores, roadmaps, and data for this user. Are you absolutely sure?")) return;
       try {
@@ -82,7 +82,7 @@ function AdminPage() {
       } catch(e) { alert("Failed to delete user"); }
   };
 
-  // ✅ NEW: Delete Squad Logic
+  
   const handleDeleteSquad = async (squadId) => {
       if(!confirm("⚠️ Admin Action: Disbanding this squad will remove all members from it. Continue?")) return;
       try {

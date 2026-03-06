@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     signIn: (data) => supabase.auth.signInWithPassword(data),
     signUp: (data) => supabase.auth.signUp(data),
     
-    // ✅ BULLETPROOF LOGOUT: Forces local state to clear even if Supabase fails
+    
     signOut: async () => {
       try {
         await supabase.auth.signOut();
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   if (loading) {
-    // ✅ UPDATED: Spinner now respects Light/Dark Mode CSS variables
+
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', background: 'var(--bg-solid)' }}>
         <div style={{ width: '40px', height: '40px', border: '4px solid var(--card-border)', borderTop: '4px solid var(--accent-blue)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>

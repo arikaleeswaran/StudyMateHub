@@ -11,7 +11,7 @@ function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isAdminMode, setIsAdminMode] = useState(false); // ✅ NEW STATE FOR ADMIN UI
+  const [isAdminMode, setIsAdminMode] = useState(false); 
   const [fullName, setFullName] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -48,7 +48,7 @@ function AuthPage() {
     setError('');
     setMessage('');
 
-    // ✅ UPDATED ADMIN LOGIN LOGIC
+    
     if (isAdminMode) {
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';

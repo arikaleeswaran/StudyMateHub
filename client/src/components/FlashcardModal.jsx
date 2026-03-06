@@ -74,7 +74,6 @@ function FlashcardModal({ cards, onClose, onReviewUpdate }) {
             </div>
         </div>
 
-        {/* Controls */}
         {isFlipped ? (
             <div style={{display:'flex', gap:'10px', justifyContent:'center'}}>
                 <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} style={{...styles.btn, background:'var(--accent-red)'}}>Hard (1d)</button>

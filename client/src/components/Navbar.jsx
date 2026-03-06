@@ -12,7 +12,7 @@ function Navbar() {
 
   const isAdmin = localStorage.getItem('admin_auth') === 'true';
 
-  // ✅ THE ULTIMATE LOGOUT FIX
+
   const handleLogout = async () => {
       // 1. Remove admin status immediately
       localStorage.removeItem('admin_auth');
@@ -20,7 +20,7 @@ function Navbar() {
       // 2. MANUALLY NUKE SUPABASE TOKENS FROM THE BROWSER
       // This forces the browser to forget the user, even if the server throws an error!
       Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-')) { // Supabase stores tokens with this prefix
+          if (key.startsWith('sb-')) { 
               localStorage.removeItem(key);
           }
       });
@@ -65,7 +65,6 @@ function Navbar() {
             <button onClick={() => navigate('/profile')} style={styles.navButton}><FaUserCircle size={18} /> {isMobile ? '' : 'Dashboard'}</button>
             <button onClick={() => navigate('/admin/login')} style={styles.navButton} title="Admin Panel"><FaUserShield size={18} color="var(--accent-red)" /></button>
             
-            {/* ✅ MUST USE THE NEW handleLogout FUNCTION HERE */}
             <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
           </>
         ) : (

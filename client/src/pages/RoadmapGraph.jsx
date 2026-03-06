@@ -5,7 +5,7 @@ import { FaArrowRight, FaArrowLeft, FaPlayCircle, FaFilePdf, FaSave, FaGlobe, Fa
 import AssessmentModal from '../components/AssessmentModal';
 import KnowledgeCheckModal from '../components/KnowledgeCheckModal';
 import NodeChatModal from '../components/NodeChatModal'; 
-import CelebrationModal from '../components/CelebrationModal'; // ✅ IMPORTED CELEBRATION MODAL
+import CelebrationModal from '../components/CelebrationModal'; 
 import Navbar from '../components/Navbar';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +30,6 @@ function RoadmapGraph() {
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
   
-  // ✅ ADDED CELEBRATION STATE
   const [celebration, setCelebration] = useState({ show: false, title: '', subtitle: '', type: 'node' });
 
   const [quizType, setQuizType] = useState('full'); 
@@ -54,7 +53,7 @@ function RoadmapGraph() {
         
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-            // ✅ UPDATED: Pass user_id so backend fetches your exact saved nodes!
+           
             const userQuery = user ? `&user_id=${user.id}` : '';
             const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}${userQuery}`);
             const data = res.data;
@@ -150,17 +149,17 @@ function RoadmapGraph() {
         const isAlreadyCompleted = completedNodes.has(checkNode.label);
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
         
-        // ✅ DYNAMIC CELEBRATION LOGIC
+        
         const newCompletedCount = isAlreadyCompleted ? completedNodes.size : completedNodes.size + 1;
         
         if (newCompletedCount === nodes.length && !isAlreadyCompleted) {
-            // Finished the whole course
+            
             setCelebration({ show: true, title: 'Path Conquered! 🏆', subtitle: `You have completely mastered ${topic}!`, type: 'course' });
         } else if (quizType === 'diagnostic') {
-            // Passed the quick 5-question check
+            
             setCelebration({ show: true, title: 'Fast Track! ⚡', subtitle: `You already know ${checkNode.label}. Moving on!`, type: 'node' });
         } else {
-            // Passed the full 10-question test
+            
             setCelebration({ show: true, title: 'Module Passed! 🌟', subtitle: `Great job mastering ${checkNode.label}. Keep it up!`, type: 'node' });
         }
     } else {
@@ -219,7 +218,7 @@ function RoadmapGraph() {
       <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
             
-            {/* ✅ NEW: Mode Label Badge Added Here */}
+           
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
                 <span style={{
                     background: mode === 'panic' ? 'rgba(255, 107, 107, 0.2)' : 'rgba(0, 210, 255, 0.2)',
@@ -363,7 +362,7 @@ function RoadmapGraph() {
         ) : <div style={{textAlign:'center', color:'#aaa', marginTop:'50px'}}><h3>👆 Click a topic bubble above to start learning</h3></div>}
       </div>
 
-      {/* ✅ RENDER CELEBRATION MODAL HERE */}
+      
       <CelebrationModal 
           isOpen={celebration.show} 
           title={celebration.title} 

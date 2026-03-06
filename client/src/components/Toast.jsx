@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { FaCheckCircle, FaInfoCircle } from 'react-icons/fa';
-import useMobile from '../hooks/useMobile'; // ✅ Import Hook
+import useMobile from '../hooks/useMobile'; 
 
 function Toast({ message, type = 'success', onClose }) {
   const isMobile = useMobile();
@@ -17,7 +17,7 @@ function Toast({ message, type = 'success', onClose }) {
   return (
     <div style={{
       position: 'fixed',
-      // ✅ Mobile: Bottom Center | Desktop: Top Right
+
       top: isMobile ? 'auto' : '90px', 
       bottom: isMobile ? '20px' : 'auto',
       right: isMobile ? 'auto' : '20px',

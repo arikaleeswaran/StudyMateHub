@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext'; // ✅ Added ThemeProvider
+import { ThemeProvider } from './context/ThemeContext'; 
 
 // 1. Eagerly load the Homepage so it appears instantly
 import HomePage from './pages/HomePage';
@@ -27,7 +27,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <ThemeProvider> {/* ✅ App is now wrapped! */}
+        <ThemeProvider> 
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<HomePage />} />

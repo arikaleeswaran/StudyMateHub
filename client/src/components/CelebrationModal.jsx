@@ -9,7 +9,6 @@ function CelebrationModal({ isOpen, title, subtitle, onClose, type = 'node' }) {
   useEffect(() => {
     if (isOpen) {
       // 🎵 Play Success Chime Sound
-      // We use a free, reliable CDN link for a quick success ding
       const audio = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=success-1-6297.mp3');
       audio.volume = 0.6; // Not too loud
       audio.play().catch(err => console.log("Audio autoplay blocked by browser (user must interact first)", err));
@@ -29,7 +28,6 @@ function CelebrationModal({ isOpen, title, subtitle, onClose, type = 'node' }) {
         background: 'var(--overlay-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999,
         backdropFilter: 'blur(5px)'
     }}>
-        {/* 🎊 The Confetti Engine */}
         <Confetti 
             width={dimensions.width} 
             height={dimensions.height} 
@@ -40,7 +38,7 @@ function CelebrationModal({ isOpen, title, subtitle, onClose, type = 'node' }) {
             style={{ zIndex: 10000 }}
         />
         
-        {/* The Pop-up Card */}
+       
         <div style={{
             background: 'var(--card-bg)', color: 'var(--text-main)', padding: isMobile ? '30px 20px' : '40px',
             borderRadius: '20px', border: '2px solid var(--accent-green)', textAlign: 'center',
