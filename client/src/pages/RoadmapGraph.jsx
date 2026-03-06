@@ -53,7 +53,7 @@ function RoadmapGraph() {
         
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-           
+            
             const userQuery = user ? `&user_id=${user.id}` : '';
             const res = await axios.get(`${baseUrl}/api/roadmap?topic=${topic}&mode=${mode}${userQuery}`);
             const data = res.data;
@@ -65,10 +65,18 @@ function RoadmapGraph() {
             if (mode === 'panic') showNotification("🚨 Panic Mode: Crash Course Activated!", "error");
         } catch(e) { console.error(e); }
 
+        // ✅ FIXED: Strict Progress Logic to match the Profile Page (Requires score >= 6)
         if (user) {
             const { data } = await supabase.from('node_progress').select('node_label, quiz_score').eq('user_id', user.id).eq('topic', topic);
             if (data) {
-                const passedNodes = data.filter(d => d.quiz_score >= 3).map(d => d.node_label);
+                const maxScores = {};
+                data.forEach(d => {
+                    if (!maxScores[d.node_label] || d.quiz_score > maxScores[d.node_label]) {
+                        maxScores[d.node_label] = d.quiz_score;
+                    }
+                });
+                
+                const passedNodes = Object.keys(maxScores).filter(label => maxScores[label] >= 6);
                 setCompletedNodes(new Set(passedNodes));
             }
         }
@@ -77,9 +85,11 @@ function RoadmapGraph() {
     init();
   }, [topic, user, location.search]);
 
+  // ✅ FIXED: Progress Math Logic (Only count nodes inside the current roadmap)
   useEffect(() => {
       if (nodes.length > 0) {
-          const percent = Math.round((completedNodes.size / nodes.length) * 100);
+          const validCompletedCount = nodes.filter(node => completedNodes.has(node.label)).length;
+          const percent = Math.min(Math.round((validCompletedCount / nodes.length) * 100), 100);
           setProgress(percent);
       }
   }, [nodes, completedNodes]);
@@ -149,17 +159,14 @@ function RoadmapGraph() {
         const isAlreadyCompleted = completedNodes.has(checkNode.label);
         setCompletedNodes(prev => new Set(prev).add(checkNode.label));
         
+        // Count valid completed nodes for celebration
+        const newValidCompletedCount = nodes.filter(n => completedNodes.has(n.label) || n.label === checkNode.label).length;
         
-        const newCompletedCount = isAlreadyCompleted ? completedNodes.size : completedNodes.size + 1;
-        
-        if (newCompletedCount === nodes.length && !isAlreadyCompleted) {
-            
+        if (newValidCompletedCount === nodes.length && !isAlreadyCompleted) {
             setCelebration({ show: true, title: 'Path Conquered! 🏆', subtitle: `You have completely mastered ${topic}!`, type: 'course' });
         } else if (quizType === 'diagnostic') {
-            
             setCelebration({ show: true, title: 'Fast Track! ⚡', subtitle: `You already know ${checkNode.label}. Moving on!`, type: 'node' });
         } else {
-            
             setCelebration({ show: true, title: 'Module Passed! 🌟', subtitle: `Great job mastering ${checkNode.label}. Keep it up!`, type: 'node' });
         }
     } else {
@@ -207,7 +214,8 @@ function RoadmapGraph() {
   if (mapLoading) return <div className="spinner"></div>;
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b, #0f172a)', color:'white', display: 'flex', flexDirection: 'column' }}>
+    // ✅ FIXED: Restored var(--bg-gradient) and var(--text-main) for Light/Dark mode
+    <div style={{ width: '100%', minHeight: '100vh', background: 'var(--bg-gradient)', color:'var(--text-main)', display: 'flex', flexDirection: 'column' }}>
       
       <div style={{ position: 'sticky', top: 0, zIndex: 100, width: '100%' }}>
          <Navbar />
@@ -215,30 +223,30 @@ function RoadmapGraph() {
 
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
 
-      <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
+      {/* ✅ FIXED: Restored var(--nav-bg) and var(--card-border) */}
+      <div style={{ padding: '20px', borderBottom: '1px solid var(--card-border)', background: 'var(--nav-bg)', backdropFilter: 'blur(10px)', position:'sticky', top: isMobile ? '120px' : '70px', zIndex:50 }}> 
         <div style={{maxWidth:'1000px', margin:'0 auto', position:'relative'}}>
             
-           
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
                 <span style={{
-                    background: mode === 'panic' ? 'rgba(255, 107, 107, 0.2)' : 'rgba(0, 210, 255, 0.2)',
-                    color: mode === 'panic' ? '#ff6b6b' : '#00d2ff',
+                    background: mode === 'panic' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(0, 123, 255, 0.1)',
+                    color: mode === 'panic' ? 'var(--accent-red)' : 'var(--accent-blue)',
                     padding: '5px 15px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', 
-                    border: `1px solid ${mode === 'panic' ? '#ff6b6b' : '#00d2ff'}`,
+                    border: `1px solid ${mode === 'panic' ? 'var(--accent-red)' : 'var(--accent-blue)'}`,
                     textTransform: 'uppercase', letterSpacing: '1px'
                 }}>
                     {mode === 'panic' ? '🚨 Panic Mode' : '📚 Regular Mode'}
                 </span>
             </div>
 
-            <h2 style={{ margin: '0 0 10px 0', color: 'white', textTransform: 'capitalize', textAlign:'center', fontSize: isMobile ? '1.5rem' : '2rem' }}>
-                🗺️ Path: <span style={{color: '#00d2ff'}}>{topic}</span>
+            <h2 style={{ margin: '0 0 10px 0', color: 'var(--text-main)', textTransform: 'capitalize', textAlign:'center', fontSize: isMobile ? '1.5rem' : '2rem' }}>
+                🗺️ Path: <span style={{color: 'var(--accent-blue)'}}>{topic}</span>
             </h2>
-            <div style={{width:'100%', background:'rgba(255,255,255,0.1)', height:'10px', borderRadius:'5px', overflow:'hidden', marginBottom:'10px'}}>
-                <div style={{width:`${progress}%`, background:'#28a745', height:'100%', transition:'width 0.5s ease'}}></div>
+            <div style={{width:'100%', background:'var(--card-border)', height:'10px', borderRadius:'5px', overflow:'hidden', marginBottom:'10px'}}>
+                <div style={{width:`${progress}%`, background:'var(--accent-green)', height:'100%', transition:'width 0.5s ease'}}></div>
             </div>
-            <p style={{textAlign:'center', fontSize:'0.9rem', color:'#aaa', margin:0}}>{progress}% Completed</p>
-            <button onClick={handleSaveRoadmap} style={{position: 'absolute', right: '0', top: '0', padding: '8px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>💾</button>
+            <p style={{textAlign:'center', fontSize:'0.9rem', color:'var(--text-muted)', margin:0}}>{progress}% Completed</p>
+            <button onClick={handleSaveRoadmap} style={{position: 'absolute', right: '0', top: '0', padding: '8px 15px', background: 'var(--accent-green)', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold'}}>💾</button>
         </div>
       </div>
 
@@ -269,19 +277,19 @@ function RoadmapGraph() {
                                     style={{
                                         width: isMobile ? '140px' : '180px', height: isMobile ? '140px' : '180px',
                                         borderRadius: '50%',
-                                        background: isCompleted ? 'rgba(40, 167, 69, 0.2)' : isSelected ? 'rgba(0, 210, 255, 0.2)' : 'rgba(255,255,255,0.05)',
-                                        border: isLocked ? '3px solid #555' : isCompleted ? '3px solid #28a745' : isSelected ? '3px solid #00d2ff' : '3px solid rgba(255,255,255,0.2)',
-                                        color: 'white',
+                                        background: isCompleted ? 'rgba(40, 167, 69, 0.1)' : isSelected ? 'rgba(0, 123, 255, 0.1)' : 'var(--card-bg)',
+                                        border: isLocked ? '3px solid var(--text-muted)' : isCompleted ? '3px solid var(--accent-green)' : isSelected ? '3px solid var(--accent-blue)' : '3px solid var(--card-border)',
+                                        color: 'var(--text-main)',
                                         display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
                                         padding: '15px', textAlign: 'center', 
                                         cursor: isLocked ? 'not-allowed' : 'pointer',
-                                        boxShadow: isSelected ? '0 0 20px rgba(0,210,255,0.4)' : 'none',
+                                        boxShadow: isSelected ? '0 0 20px rgba(0, 123, 255, 0.3)' : '0 5px 15px rgba(0,0,0,0.05)',
                                         transition: 'all 0.3s ease', position: 'relative',
                                         wordBreak: 'break-word', overflow: 'hidden'
                                     }}
                                 >
-                                    {isLocked ? <FaLock size={20} color="#777" style={{marginBottom:'8px'}}/> : 
-                                     isCompleted ? <FaCheckCircle color="#28a745" size={24} style={{marginBottom:'8px'}} /> : null}
+                                    {isLocked ? <FaLock size={20} color="var(--text-muted)" style={{marginBottom:'8px'}}/> : 
+                                     isCompleted ? <FaCheckCircle color="var(--accent-green)" size={24} style={{marginBottom:'8px'}} /> : null}
                                     <span style={{fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight:'bold', lineHeight:'1.3', padding:'0 5px'}}>
                                         {node.label}
                                     </span>
@@ -290,7 +298,7 @@ function RoadmapGraph() {
                                     <div style={{
                                         margin: isMobile ? '10px 0' : '0 20px', 
                                         fontSize: '24px', 
-                                        color: isCompleted ? '#28a745' : '#555'
+                                        color: isCompleted ? 'var(--accent-green)' : 'var(--text-muted)'
                                     }}>
                                         {isMobile ? <FaArrowDown/> : (isEvenRow ? <FaArrowRight/> : <FaArrowLeft/>)}
                                     </div>
@@ -299,27 +307,28 @@ function RoadmapGraph() {
                         );
                     })}
                 </div>
-                {!isMobile && rowIndex < rows.length -1 && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed #555' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed #555', borderBottom: '4px dashed #555', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
+                {!isMobile && rowIndex < rows.length -1 && (<div style={{position: 'absolute', right: isEvenRow ? '10%' : 'auto', left: isEvenRow ? 'auto' : '10%', top: '50%', height: '100%', width: '120px', zIndex: 1, borderRight: isEvenRow ? '4px dashed var(--card-border)' : 'none', borderLeft: isEvenRow ? 'none' : '4px dashed var(--card-border)', borderBottom: '4px dashed var(--card-border)', borderBottomRightRadius: isEvenRow ? '120px' : '0', borderBottomLeftRadius: isEvenRow ? '0' : '120px'}}></div>)}
             </div>
           );
         })}
       </div>
 
-      <div ref={resourcesRef} style={{ background: 'rgba(0,0,0,0.2)', padding: '50px 20px', borderTop: '2px solid rgba(255,255,255,0.1)', minHeight: '500px' }}>
+      {/* ✅ FIXED: Restored var(--bg-solid) */}
+      <div ref={resourcesRef} style={{ background: 'var(--bg-solid)', padding: '50px 20px', borderTop: '2px solid var(--card-border)', minHeight: '500px' }}>
         {selectedNode ? (
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                 
                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', flexWrap:'wrap', gap:'15px'}}>
                     <div style={{display:'flex', gap:'10px', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center'}}>
-                        <h2 style={{ borderLeft: '6px solid #00d2ff', paddingLeft: '15px', margin:0, color: 'white' }}>
-                            📚 Resources: <span style={{color:'#00d2ff'}}>{selectedNode.label}</span>
+                        <h2 style={{ borderLeft: '6px solid var(--accent-blue)', paddingLeft: '15px', margin:0, color: 'var(--text-main)' }}>
+                            📚 Resources: <span style={{color:'var(--accent-blue)'}}>{selectedNode.label}</span>
                         </h2>
                         {!loadingResources && resources.trust_score !== null && (
                             <div style={{
                                 padding: '8px 16px', borderRadius: '30px',
-                                background: resources.trust_score >= 80 ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)',
-                                border: resources.trust_score >= 80 ? '1px solid #28a745' : '1px solid #ffc107',
-                                color: resources.trust_score >= 80 ? '#28a745' : '#ffc107',
+                                background: resources.trust_score >= 80 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)',
+                                border: resources.trust_score >= 80 ? '1px solid var(--accent-green)' : '1px solid #ffc107',
+                                color: resources.trust_score >= 80 ? 'var(--accent-green)' : '#ffc107',
                                 fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', animation: 'fadeIn 0.5s'
                             }}>
                                 {resources.trust_score >= 80 ? '🔥' : '😐'} {resources.trust_score}% Satisfaction <span style={{fontSize:'0.8rem', opacity:0.8}}>({resources.review_count} reviews)</span>
@@ -327,12 +336,12 @@ function RoadmapGraph() {
                         )}
                     </div>
                     <div style={{display:'flex', gap:'10px'}}>
-                        <button onClick={() => setShowChatModal(true)} style={{padding:'15px 30px', background:'#00d2ff', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px'}}>
+                        <button onClick={() => setShowChatModal(true)} style={{padding:'15px 30px', background:'var(--accent-blue)', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px'}}>
                             <FaRobot size={24}/> Ask AI
                         </button>
 
                         {!completedNodes.has(selectedNode.label) && (
-                            <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'#28a745', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', width: isMobile ? '100%' : 'auto', justifyContent: 'center'}}>
+                            <button onClick={handleStartFullAssessment} style={{padding:'15px 30px', background:'var(--accent-green)', color:'white', border:'none', borderRadius:'30px', fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', width: isMobile ? '100%' : 'auto', justifyContent: 'center'}}>
                                 <FaGraduationCap size={24}/> Take Assessment
                             </button>
                         )}
@@ -342,27 +351,26 @@ function RoadmapGraph() {
                 {loadingResources ? <div className="spinner"></div> : (
                     <div style={{display:'flex', gap:'30px', flexWrap:'wrap', flexDirection: isMobile ? 'column' : 'row'}}>
                         {/* Videos */}
-                        <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
-                            <h3 style={{borderBottom:'2px solid #ff6b6b', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaPlayCircle color="#ff6b6b"/> Videos</h3>
-                            <div style={{display:'grid', gap:'15px'}}>{resources.videos.map((v, i) => (<div key={i} style={{display:'flex', gap:'10px', alignItems:'center'}}><a href={v.url} target="_blank" rel="noreferrer" style={{display:'flex', gap:'10px', textDecoration:'none', color:'white', width:'100%'}}><img src={v.thumbnail} style={{width:'80px', height:'60px', borderRadius:'5px', objectFit:'cover'}} /><div style={{flex:1}}><div style={{fontSize:'0.9rem', fontWeight:'bold', lineHeight:'1.2'}}>{v.title.slice(0, 50)}...</div><div style={{fontSize:'0.8rem', color:'#aaa'}}>{v.channel}</div></div></a><button onClick={() => handleSaveResource(v, 'video')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
+                        <div style={{flex: 1, minWidth:'300px', background:'var(--card-bg)', padding:'20px', borderRadius:'10px', border:'1px solid var(--card-border)'}}>
+                            <h3 style={{borderBottom:'2px solid var(--accent-red)', paddingBottom:'10px', marginTop:0, color: 'var(--text-main)'}}><FaPlayCircle color="var(--accent-red)"/> Videos</h3>
+                            <div style={{display:'grid', gap:'15px'}}>{resources.videos.map((v, i) => (<div key={i} style={{display:'flex', gap:'10px', alignItems:'center'}}><a href={v.url} target="_blank" rel="noreferrer" style={{display:'flex', gap:'10px', textDecoration:'none', color:'var(--text-main)', width:'100%'}}><img src={v.thumbnail} style={{width:'80px', height:'60px', borderRadius:'5px', objectFit:'cover'}} /><div style={{flex:1}}><div style={{fontSize:'0.9rem', fontWeight:'bold', lineHeight:'1.2'}}>{v.title.slice(0, 50)}...</div><div style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>{v.channel}</div></div></a><button onClick={() => handleSaveResource(v, 'video')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="var(--accent-blue)"/></button></div>))}</div>
                         </div>
                         {/* Articles */}
-                        <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
-                             <h3 style={{borderBottom:'2px solid #4caf50', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaGlobe color="#4caf50"/> Articles</h3>
-                             <div style={{display:'grid', gap:'10px'}}>{resources.articles?.map((a, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={a.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'1.2rem'}}>📄</span><div style={{fontWeight:'bold', fontSize:'0.95rem'}}>{a.title}</div></a><button onClick={() => handleSaveResource(a, 'article')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
+                        <div style={{flex: 1, minWidth:'300px', background:'var(--card-bg)', padding:'20px', borderRadius:'10px', border:'1px solid var(--card-border)'}}>
+                             <h3 style={{borderBottom:'2px solid var(--accent-green)', paddingBottom:'10px', marginTop:0, color: 'var(--text-main)'}}><FaGlobe color="var(--accent-green)"/> Articles</h3>
+                             <div style={{display:'grid', gap:'10px'}}>{resources.articles?.map((a, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={a.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'var(--text-main)', display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'1.2rem'}}>📄</span><div style={{fontWeight:'bold', fontSize:'0.95rem'}}>{a.title}</div></a><button onClick={() => handleSaveResource(a, 'article')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="var(--accent-blue)"/></button></div>))}</div>
                         </div>
                         {/* PDFs */}
-                        <div style={{flex: 1, minWidth:'300px', background:'rgba(255,255,255,0.05)', padding:'20px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)'}}>
-                             <h3 style={{borderBottom:'2px solid #ffc107', paddingBottom:'10px', marginTop:0, color: 'white'}}><FaFilePdf color="#ffc107"/> Cheat Sheets</h3>
-                             <div style={{display:'grid', gap:'10px'}}>{resources.pdfs.map((p, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={p.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'white', display:'flex', alignItems:'center', gap:'10px', flex:1}}><FaFilePdf color="#dc3545"/><span style={{fontSize:'0.9rem', fontWeight:'500'}}>{p.title}</span></a><button onClick={() => handleSaveResource(p, 'pdf')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="#00d2ff"/></button></div>))}</div>
+                        <div style={{flex: 1, minWidth:'300px', background:'var(--card-bg)', padding:'20px', borderRadius:'10px', border:'1px solid var(--card-border)'}}>
+                             <h3 style={{borderBottom:'2px solid #ffc107', paddingBottom:'10px', marginTop:0, color: 'var(--text-main)'}}><FaFilePdf color="#ffc107"/> Cheat Sheets</h3>
+                             <div style={{display:'grid', gap:'10px'}}>{resources.pdfs.map((p, i) => (<div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><a href={p.url} target="_blank" rel="noreferrer" style={{textDecoration:'none', color:'var(--text-main)', display:'flex', alignItems:'center', gap:'10px', flex:1}}><FaFilePdf color="var(--accent-red)"/><span style={{fontSize:'0.9rem', fontWeight:'500'}}>{p.title}</span></a><button onClick={() => handleSaveResource(p, 'pdf')} style={{background:'none', border:'none', cursor:'pointer'}}><FaSave color="var(--accent-blue)"/></button></div>))}</div>
                         </div>
                     </div>
                 )}
             </div>
-        ) : <div style={{textAlign:'center', color:'#aaa', marginTop:'50px'}}><h3>👆 Click a topic bubble above to start learning</h3></div>}
+        ) : <div style={{textAlign:'center', color:'var(--text-muted)', marginTop:'50px'}}><h3>👆 Click a topic bubble above to start learning</h3></div>}
       </div>
 
-      
       <CelebrationModal 
           isOpen={celebration.show} 
           title={celebration.title} 
